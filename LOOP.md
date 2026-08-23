@@ -43,6 +43,8 @@ Design (mine, as asked): a single evidence report, published as an Artifact so i
 
 This is the deliverable Sampo actually reviews before the build is called done.
 
+**Finishing step, after Round 4 is accepted**: write a real README.md with screenshots, matching the style of Sampo's other repos (invoke the `github-update` skill for this rather than freehanding it — it knows the shared README-DESIGN.md conventions and the "accurate not humble" bar). Screenshots come from the Round 4 Playwright walkthrough evidence, not staged/fake captures. Repo: `https://github.com/011-sam-110/prompt-me-.git` (remote already wired, `master` pushed).
+
 ## Log files this loop maintains
 
 | File | Written by | Purpose |
