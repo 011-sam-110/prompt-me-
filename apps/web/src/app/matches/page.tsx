@@ -47,6 +47,16 @@ export default async function MatchesPage() {
               <Link
                 href={`/matches/${match.id}/calendar`}
                 data-match-id={match.id}
+                // The calendar page has a real write side effect on first
+                // visit (lib/date-ideas/get-or-generate-ideas.ts's
+                // lazy-generate-then-cache, ENGINEERING_SPEC.md §10) —
+                // Next.js's default Link prefetch would otherwise race a
+                // background prefetch request against the real navigation,
+                // both hitting an empty date_ideas_generated cache at once
+                // and generating two separate pairs. Next.js's own guidance
+                // is to opt out of prefetching for exactly this kind of
+                // side-effecting route.
+                prefetch={false}
                 className="block rounded-lg border border-border px-4 py-3 text-sm hover:bg-muted"
               >
                 <span className="font-medium">Matched {dateFormatter.format(match.matchedAt)}</span>

@@ -23,3 +23,4 @@ export * from "./rewatch";
 export * from "./calendar";
 export * from "./places";
 export * from "./date-proposals";
+export * from "./date-ideas";

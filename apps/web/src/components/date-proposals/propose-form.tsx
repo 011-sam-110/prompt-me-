@@ -1,8 +1,9 @@
 "use client";
 // SPEC.md §6: "Either side proposes idea + slot." Custom idea text only —
-// ROADMAP.md M9's scope: "custom idea text for now — M10's generated ideas
-// plug in later" (M10 will add a second entry point alongside this one, a
-// "pick a generated idea" surface, once date_ideas_generated has rows).
+// ROADMAP.md M9's scope was "custom idea text for now — M10's generated
+// ideas plug in later." M10's own entry point now sits alongside this one,
+// a "pick a generated idea" surface — components/date-ideas/generated-ideas-panel.tsx,
+// rendered in the same page above this form.
 // Mirrors components/calendar/own-calendar-editor.tsx's shape exactly:
 // call the server action, then router.refresh() to re-pull the server
 // component's data rather than hand-rolling client-side cache state.

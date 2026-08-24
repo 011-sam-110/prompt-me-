@@ -29,6 +29,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.120.0",
     "@vercel/blob": "^2.8.0",
     "music-metadata": "^11.15.0"
   }

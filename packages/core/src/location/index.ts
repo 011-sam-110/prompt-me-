@@ -14,3 +14,4 @@ export {
 export { fuzzLocation, LOCATION_GEOHASH_LENGTH, type FuzzedLocation } from "./fuzz-location";
 export { isValidRadiusKm, MIN_RADIUS_KM, MAX_RADIUS_KM } from "./radius";
 export { haversineDistanceKm, isWithinRadiusKm } from "./distance";
+export { sharedGeohashCell } from "./shared-cell";

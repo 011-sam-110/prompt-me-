@@ -20,10 +20,12 @@ import {
   getMatchCalendar,
 } from "@/lib/calendar/get-match-calendar";
 import { getMatchProposals } from "@/lib/date-proposals/get-match-proposals";
+import { getOrGenerateIdeas } from "@/lib/date-ideas/get-or-generate-ideas";
 import { OwnCalendarEditor } from "@/components/calendar/own-calendar-editor";
 import { CalendarSlotList } from "@/components/calendar/calendar-slot-list";
 import { ProposeForm } from "@/components/date-proposals/propose-form";
 import { ProposalList } from "@/components/date-proposals/proposal-list";
+import { GeneratedIdeasPanel } from "@/components/date-ideas/generated-ideas-panel";
 
 export default async function MatchCalendarPage({
   params,
@@ -64,6 +66,13 @@ export default async function MatchCalendarPage({
   // is not expected to ever throw here; it isn't re-wrapped in its own
   // try/catch for that reason.
   const { proposals, viewerId } = await getMatchProposals(db, matchId, user.id);
+  // Lazily generates on first visit, then reads the cache on every visit
+  // after — ENGINEERING_SPEC.md §10's "regenerated once per match, not per
+  // proposal" (get-or-generate-ideas.ts's own header comment). Same
+  // "already proven a participant of an active match by the calendar fetch
+  // above, so this isn't expected to throw here" reasoning as
+  // getMatchProposals just above it.
+  const generatedIdeas = await getOrGenerateIdeas(db, matchId, user.id);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-lg flex-col gap-6 px-6 py-16">
@@ -89,6 +98,11 @@ export default async function MatchCalendarPage({
           emptyLabel="They haven't added any times yet."
           testId="partner-calendar-slots"
         />
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-medium text-muted-foreground">Generated date ideas</h2>
+        <GeneratedIdeasPanel matchId={matchId} ideas={generatedIdeas} />
       </section>
 
       <section className="flex flex-col gap-2">

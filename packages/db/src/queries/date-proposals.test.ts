@@ -16,11 +16,13 @@ import * as schema from "../schema";
 import { ensureUserForClerkId } from "./users";
 import { ensurePromptsSeeded } from "./prompts";
 import { insertMatchIfNotExists } from "./matches";
+import { insertGeneratedDateIdeas } from "./date-ideas";
 import {
   DateProposalNotAcceptedError,
   DateProposalNotPendingError,
   acceptDateProposal,
   createDateProposal,
+  createGeneratedDateProposal,
   declineDateProposal,
   getDateProposalById,
   getDateProposalsForMatch,
@@ -71,6 +73,28 @@ describe("date_proposals queries", () => {
     expect(proposal.status).toBe("pending");
     expect(proposal.venuePlaceId).toBeNull();
     expect(proposal.generatedIdeaId).toBeNull();
+  });
+
+  it("createGeneratedDateProposal inserts a pending, generated-idea row referencing its cached idea", async () => {
+    const { match, a } = await makeMatch("clerk_dp_generated_a", "clerk_dp_generated_b");
+    const [idea] = await insertGeneratedDateIdeas(db, match.id, [
+      { ideaText: "Coffee at the corner café", rationale: "Both mentioned coffee." },
+      { ideaText: "Walk in the botanic gardens", rationale: "Both mentioned nature." },
+    ]);
+
+    const proposal = await createGeneratedDateProposal(db, {
+      matchId: match.id,
+      proposedByUserId: a,
+      generatedIdeaId: idea!.id,
+      ideaText: idea!.ideaText,
+      slotStartAt: at("09:00"),
+      slotEndAt: at("10:00"),
+    });
+
+    expect(proposal.ideaSource).toBe("generated");
+    expect(proposal.generatedIdeaId).toBe(idea!.id);
+    expect(proposal.ideaText).toBe(idea!.ideaText);
+    expect(proposal.status).toBe("pending");
   });
 
   it("getDateProposalById returns the row, and undefined for a nonexistent id", async () => {

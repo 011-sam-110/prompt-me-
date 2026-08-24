@@ -20,3 +20,6 @@ export const dateIdeasGenerated = pgTable("date_ideas_generated", {
     .notNull()
     .defaultNow(),
 });
+
+export type DateIdeaGenerated = typeof dateIdeasGenerated.$inferSelect;
+export type NewDateIdeaGenerated = typeof dateIdeasGenerated.$inferInsert;

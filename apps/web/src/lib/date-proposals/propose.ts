@@ -5,11 +5,11 @@
 // reaches the database, which does no business-rule checking of its own
 // (packages/db/src/queries/date-proposals.ts's own header comment).
 //
-// ROADMAP.md M9's scope: "custom idea text for now — M10's generated
+// ROADMAP.md M9's scope was: "custom idea text for now — M10's generated
 // ideas plug in later." This file only ever writes ideaSource: "custom"
-// (via createDateProposal) — a sibling composition point for
-// generator-sourced proposals is M10's to add once date_ideas_generated
-// actually has rows.
+// (via createDateProposal) — the sibling composition point for
+// generator-sourced proposals is lib/date-ideas/propose-generated.ts
+// (M10, writes ideaSource: "generated" via createGeneratedDateProposal).
 import { isValidSlotRange } from "@prompt-me/core";
 import { createDateProposal, type AnyDb, type DateProposal } from "@prompt-me/db";
 import { assertActiveMatchParticipant } from "./match-access";

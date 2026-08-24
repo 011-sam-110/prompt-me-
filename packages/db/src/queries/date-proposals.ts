@@ -19,10 +19,9 @@ export interface CreateDateProposalInput {
 
 /**
  * Always inserts `ideaSource: "custom"` — ROADMAP.md M9's own scope: "custom
- * idea text for now — M10's generated ideas plug in later." M10 will add
- * its own generated-idea insert path (a `generatedIdeaId` parameter, wired
- * to `date_ideas_generated`) once that table actually has rows to point
- * at — there's no reason to plumb an unused parameter through today.
+ * idea text for now — M10's generated ideas plug in later." `createGeneratedDateProposal`
+ * below is M10's sibling insert path for `ideaSource: "generated"`, wired
+ * to `date_ideas_generated` once that table actually had rows to point at.
  */
 export async function createDateProposal(db: AnyDb, input: CreateDateProposalInput): Promise<DateProposal> {
   const [row] = await db
@@ -38,6 +37,52 @@ export async function createDateProposal(db: AnyDb, input: CreateDateProposalInp
     .returning();
   if (!row) {
     throw new Error(`createDateProposal: insert returned no row for matchId=${input.matchId}`);
+  }
+  return row;
+}
+
+export interface CreateGeneratedDateProposalInput {
+  matchId: string;
+  proposedByUserId: string;
+  generatedIdeaId: string;
+  /** Denormalized from the `date_ideas_generated` row at propose time —
+   * same reasoning this file's header comment (copied from
+   * schema/date-proposals.ts) gives for `createDateProposal`'s `ideaText`:
+   * a proposal's wording stays stable even if the cached idea is later
+   * regenerated. The caller (apps/web's lib/date-ideas/propose-generated.ts)
+   * reads this straight off the idea row it already fetched to validate
+   * `generatedIdeaId` — this function does not re-derive it. */
+  ideaText: string;
+  slotStartAt: Date;
+  slotEndAt: Date;
+}
+
+/**
+ * The `ideaSource: "generated"` sibling to `createDateProposal` above —
+ * that function's own comment named this as M10's to add "once
+ * date_ideas_generated actually has rows to point at." Satisfies the
+ * schema's `date_proposals_generated_idea_xor` CHECK (schema/date-proposals.ts)
+ * by construction: `ideaSource` and `generatedIdeaId` are always set
+ * together here, never independently.
+ */
+export async function createGeneratedDateProposal(
+  db: AnyDb,
+  input: CreateGeneratedDateProposalInput,
+): Promise<DateProposal> {
+  const [row] = await db
+    .insert(dateProposals)
+    .values({
+      matchId: input.matchId,
+      proposedByUserId: input.proposedByUserId,
+      ideaSource: "generated",
+      ideaText: input.ideaText,
+      generatedIdeaId: input.generatedIdeaId,
+      slotStartAt: input.slotStartAt,
+      slotEndAt: input.slotEndAt,
+    })
+    .returning();
+  if (!row) {
+    throw new Error(`createGeneratedDateProposal: insert returned no row for matchId=${input.matchId}`);
   }
   return row;
 }
