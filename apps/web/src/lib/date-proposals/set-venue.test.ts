@@ -13,9 +13,15 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle, type PgliteDatabase } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import * as schema from "@prompt-me/db/schema";
-import { DateProposalNotAcceptedError, ensurePromptsSeeded, ensureUserForClerkId, insertMatchIfNotExists } from "@prompt-me/db";
-import { isDateProposalLocked } from "@prompt-me/core";
+import {
+  DateProposalNotAcceptedError,
+  ensurePromptsSeeded,
+  ensureUserForClerkId,
+  insertMatchIfNotExists,
+} from "@prompt-me/db";
+import { computeChatWindowTimes, isDateProposalLocked } from "@prompt-me/core";
 import { proposeDate } from "./propose";
 import { acceptDate, declineDate } from "./respond";
 import { InvalidVenueError, setDateVenue } from "./set-venue";
@@ -23,6 +29,10 @@ import { InvalidVenueError, setDateVenue } from "./set-venue";
 const migrationsFolder = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../packages/db/drizzle");
 
 const at = (isoTime: string) => new Date(`2026-09-10T${isoTime}:00.000Z`);
+
+async function chatWindowsForProposal(db: PgliteDatabase<typeof schema>, dateProposalId: string) {
+  return db.select().from(schema.chatWindows).where(eq(schema.chatWindows.dateProposalId, dateProposalId));
+}
 
 describe("setDateVenue", () => {
   let client: PGlite;
@@ -65,6 +75,55 @@ describe("setDateVenue", () => {
     expect(withVenue.venuePlaceId).toBe("dev-mock-place-corner-cafe");
     expect(withVenue.status).toBe("accepted");
     expect(isDateProposalLocked(withVenue)).toBe(true);
+
+    // ENGINEERING_SPEC §11 / ROADMAP.md M11: locking creates the
+    // chat_windows row, opens_at/closes_at derived from the proposal's own
+    // slotStartAt via @prompt-me/core's computeChatWindowTimes.
+    const windows = await chatWindowsForProposal(db, proposal.id);
+    expect(windows).toHaveLength(1);
+    const expected = computeChatWindowTimes(withVenue.slotStartAt);
+    expect(windows[0]!.matchId).toBe(match.id);
+    expect(windows[0]!.opensAt.getTime()).toBe(expected.opensAt.getTime());
+    expect(windows[0]!.closesAt.getTime()).toBe(expected.closesAt.getTime());
+  });
+
+  it("does NOT create a chat_windows row while the proposal is only accepted, not yet venued", async () => {
+    const { match, a, b } = await makeMatch("clerk_venue_nowindow_a", "clerk_venue_nowindow_b");
+    const proposal = await proposeDate(db, match.id, a, {
+      ideaText: "x",
+      slotStartAt: at("09:00"),
+      slotEndAt: at("10:00"),
+    });
+    await acceptDate(db, proposal.id, b);
+
+    expect(await chatWindowsForProposal(db, proposal.id)).toHaveLength(0);
+  });
+
+  it("re-running setDateVenue to change the venue after the date is already locked does not open a second window", async () => {
+    const { match, a, b } = await makeMatch("clerk_venue_rewindow_a", "clerk_venue_rewindow_b");
+    const proposal = await proposeDate(db, match.id, a, {
+      ideaText: "x",
+      slotStartAt: at("09:00"),
+      slotEndAt: at("10:00"),
+    });
+    await acceptDate(db, proposal.id, b);
+
+    await setDateVenue(db, proposal.id, b, "dev-mock-place-corner-cafe");
+    const firstWindows = await chatWindowsForProposal(db, proposal.id);
+    expect(firstWindows).toHaveLength(1);
+
+    // Changed their mind about the place — still the same (already
+    // locked) proposal.
+    const secondVenue = await setDateVenue(db, proposal.id, b, "dev-mock-place-riverside-museum");
+    expect(secondVenue.venuePlaceId).toBe("dev-mock-place-riverside-museum");
+
+    const windowsAfter = await chatWindowsForProposal(db, proposal.id);
+    expect(windowsAfter).toHaveLength(1);
+    expect(windowsAfter[0]!.id).toBe(firstWindows[0]!.id);
+    // The window's own opens_at/closes_at (fixed at the moment the date
+    // FIRST locked) is untouched by the later venue change.
+    expect(windowsAfter[0]!.opensAt.getTime()).toBe(firstWindows[0]!.opensAt.getTime());
+    expect(windowsAfter[0]!.closesAt.getTime()).toBe(firstWindows[0]!.closesAt.getTime());
   });
 
   it("rejects a venuePlaceId that resolves to a real place of a DISALLOWED type (the bypass attempt) — even submitted directly, skipping the picker", async () => {

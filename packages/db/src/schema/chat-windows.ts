@@ -26,3 +26,6 @@ export const chatWindows = pgTable(
     check("chat_windows_closes_after_opens", sql`${table.closesAt} > ${table.opensAt}`),
   ],
 );
+
+export type ChatWindow = typeof chatWindows.$inferSelect;
+export type NewChatWindow = typeof chatWindows.$inferInsert;

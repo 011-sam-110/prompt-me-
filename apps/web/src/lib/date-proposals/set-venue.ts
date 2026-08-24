@@ -11,8 +11,8 @@
 // (lib/date-proposals/actions.ts's submitSetDateVenue), skipping the picker
 // component entirely, is rejected exactly the same way a residential place
 // would be rejected from the picker's own search results.
-import { getPlacesProvider, isAllowedVenueType } from "@prompt-me/core";
-import { setDateProposalVenue, type AnyDb, type DateProposal } from "@prompt-me/db";
+import { computeChatWindowTimes, getPlacesProvider, isAllowedVenueType, isDateProposalLocked } from "@prompt-me/core";
+import { createChatWindowIfNotExists, setDateProposalVenue, type AnyDb, type DateProposal } from "@prompt-me/db";
 import { loadProposalForParticipant } from "./load-proposal";
 
 export class InvalidVenueError extends Error {
@@ -35,6 +35,18 @@ export class InvalidVenueError extends Error {
  * @prompt-me/db's DateProposalNotAcceptedError if the proposal itself isn't
  * `status = "accepted"` yet — a venue can never be attached ahead of
  * idea/slot acceptance.
+ *
+ * ENGINEERING_SPEC §11 / ROADMAP.md M11: "a chat_windows row is created
+ * when a date_proposal becomes 'locked'." This is the single place a
+ * proposal ever transitions into "locked" (@prompt-me/core's
+ * isDateProposalLocked's own header comment names exactly this: accepted +
+ * a non-null venue), so it's the single place that creates the window —
+ * computeChatWindowTimes derives opens_at/closes_at from the proposal's
+ * own slotStartAt, and createChatWindowIfNotExists
+ * (packages/db/src/queries/chat-windows.ts) persists it idempotently: a
+ * participant changing their mind about the venue after the date is
+ * already locked calls this function again for the same already-locked
+ * proposal, and that must not open (or reset) a second window.
  */
 export async function setDateVenue(
   db: AnyDb,
@@ -49,5 +61,17 @@ export async function setDateVenue(
     throw new InvalidVenueError(venuePlaceId);
   }
 
-  return setDateProposalVenue(db, proposalId, venuePlaceId);
+  const updated = await setDateProposalVenue(db, proposalId, venuePlaceId);
+
+  if (isDateProposalLocked(updated)) {
+    const { opensAt, closesAt } = computeChatWindowTimes(updated.slotStartAt);
+    await createChatWindowIfNotExists(db, {
+      matchId: updated.matchId,
+      dateProposalId: updated.id,
+      opensAt,
+      closesAt,
+    });
+  }
+
+  return updated;
 }

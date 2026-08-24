@@ -14,3 +14,5 @@ export * from "./rewatch-sessions";
 export * from "./calendar-slots";
 export * from "./date-ideas";
 export * from "./date-proposals";
+export * from "./chat-windows";
+export * from "./chat-messages";
