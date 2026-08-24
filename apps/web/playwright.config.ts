@@ -7,7 +7,14 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./playwright",
-  timeout: 30_000,
+  // A single spec here walks 4-5 fresh routes (/, /sign-up, /onboarding,
+  // /feed, /sign-in) against a cold dev server, each paying its own
+  // first-compile cost (observed 10-20s for a single route on this
+  // machine). 30s was enough for any one step but not enough for the
+  // sum across a whole test — bump to give every step its own 15s
+  // budget (see `expect.timeout` below) without the wrapping test
+  // timeout cutting it off first.
+  timeout: 90_000,
   retries: 0,
   reporter: [["list"]],
   // Dev mode compiles each route on its first request, which can push a
