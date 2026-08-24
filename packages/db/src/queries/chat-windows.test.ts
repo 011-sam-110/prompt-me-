@@ -16,7 +16,13 @@ import { ensureUserForClerkId } from "./users";
 import { ensurePromptsSeeded } from "./prompts";
 import { insertMatchIfNotExists } from "./matches";
 import { acceptDateProposal, createDateProposal } from "./date-proposals";
-import { createChatWindowIfNotExists, getChatWindowById, getChatWindowByProposalId } from "./chat-windows";
+import {
+  createChatWindowIfNotExists,
+  getChatWindowById,
+  getChatWindowByProposalId,
+  getChatWindowsPendingOpeningReminder,
+  markChatWindowReminderSent,
+} from "./chat-windows";
 
 const migrationsFolder = resolve(dirname(fileURLToPath(import.meta.url)), "../../drizzle");
 const MINUTE_MS = 60 * 1000;
@@ -159,5 +165,86 @@ describe("chat_windows queries", () => {
     expect(secondWindow.id).not.toBe(firstWindow.id);
     expect((await getChatWindowByProposalId(db, firstProposal.id))?.id).toBe(firstWindow.id);
     expect((await getChatWindowByProposalId(db, secondProposal.id))?.id).toBe(secondWindow.id);
+  });
+});
+
+// ROADMAP.md M13 / ENGINEERING_SPEC.md §14's "chat window opening in 15
+// minutes" poll — mechanical coverage only, same split as this file's own
+// header comment: whether a pending row is actually DUE right now is
+// @prompt-me/core's isChatWindowOpeningReminderDue's job
+// (packages/core/src/chat-windows/opening-reminder.test.ts), not these
+// queries'.
+describe("getChatWindowsPendingOpeningReminder / markChatWindowReminderSent", () => {
+  let client: PGlite;
+  let db: PgliteDatabase<typeof schema>;
+
+  beforeAll(async () => {
+    client = new PGlite();
+    db = drizzle(client, { schema });
+    await migrate(db, { migrationsFolder });
+    await ensurePromptsSeeded(db);
+  });
+
+  afterAll(async () => {
+    await client.close();
+  });
+
+  async function makeChatWindow(clerkIdA: string, clerkIdB: string) {
+    const a = await ensureUserForClerkId(db, clerkIdA);
+    const b = await ensureUserForClerkId(db, clerkIdB);
+    const match = await insertMatchIfNotExists(db, { userAId: a.id, userBId: b.id });
+    const proposal = await createDateProposal(db, {
+      matchId: match.id,
+      proposedByUserId: a.id,
+      ideaText: "Coffee at the corner café",
+      slotStartAt: at("18:00"),
+      slotEndAt: at("19:00"),
+    });
+    await acceptDateProposal(db, proposal.id);
+    const opensAt = new Date(proposal.slotStartAt.getTime() - 60 * MINUTE_MS);
+    const closesAt = new Date(proposal.slotStartAt.getTime() + 4 * HOUR_MS);
+    const window = await createChatWindowIfNotExists(db, {
+      matchId: match.id,
+      dateProposalId: proposal.id,
+      opensAt,
+      closesAt,
+    });
+    return { window, match, proposal };
+  }
+
+  it("a freshly-created window has reminderSentAt = null and is returned as pending", async () => {
+    const { window } = await makeChatWindow("clerk_cw_reminder_pending_a", "clerk_cw_reminder_pending_b");
+
+    expect(window.reminderSentAt).toBeNull();
+    const pending = await getChatWindowsPendingOpeningReminder(db);
+    expect(pending.map((w) => w.id)).toContain(window.id);
+  });
+
+  it("markChatWindowReminderSent sets reminderSentAt and the window stops being returned as pending", async () => {
+    const { window } = await makeChatWindow("clerk_cw_reminder_mark_a", "clerk_cw_reminder_mark_b");
+    const sentAt = new Date("2026-09-10T16:45:00.000Z");
+
+    const updated = await markChatWindowReminderSent(db, window.id, sentAt);
+    expect(updated.reminderSentAt?.getTime()).toBe(sentAt.getTime());
+
+    const pending = await getChatWindowsPendingOpeningReminder(db);
+    expect(pending.map((w) => w.id)).not.toContain(window.id);
+  });
+
+  it("markChatWindowReminderSent throws for a nonexistent chat window id", async () => {
+    await expect(
+      markChatWindowReminderSent(db, "00000000-0000-0000-0000-000000000000", new Date()),
+    ).rejects.toThrow(/no chat_windows row found/);
+  });
+
+  it("marking one window's reminder sent never touches a sibling window still pending", async () => {
+    const { window: windowA } = await makeChatWindow("clerk_cw_reminder_iso_a1", "clerk_cw_reminder_iso_a2");
+    const { window: windowB } = await makeChatWindow("clerk_cw_reminder_iso_b1", "clerk_cw_reminder_iso_b2");
+
+    await markChatWindowReminderSent(db, windowA.id, new Date());
+
+    const pending = await getChatWindowsPendingOpeningReminder(db);
+    expect(pending.map((w) => w.id)).not.toContain(windowA.id);
+    expect(pending.map((w) => w.id)).toContain(windowB.id);
   });
 });

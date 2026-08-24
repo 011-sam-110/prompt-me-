@@ -26,3 +26,4 @@ export * from "./date-proposals";
 export * from "./date-ideas";
 export * from "./chat-windows";
 export * from "./realtime";
+export * from "./notifications";

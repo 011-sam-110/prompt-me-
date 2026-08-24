@@ -17,6 +17,21 @@ export interface InsertMatchInput {
   userBId: string;
 }
 
+export interface InsertMatchResult {
+  match: Match;
+  /** True only when this call is the one that actually inserted the row —
+   * false when a `matches` row for this pair already existed (whether from
+   * an earlier genuine creation, or a same-pair race this call lost).
+   * ROADMAP.md M13 / ENGINEERING_SPEC §14 needs exactly this distinction:
+   * apps/web/src/lib/matches/check-and-create-match.ts only sends the
+   * "new match" email when `created` is true — never on the repeat calls
+   * every subsequent clip_views write for an already-matched pair makes
+   * (this file's own header comment: recordClipViewPosition never
+   * un-completes a row, so checkAndCreateMatchIfMutual keeps re-running
+   * against an already-complete pair on every later write). */
+  created: boolean;
+}
+
 /**
  * Idempotent insert — same "onConflictDoNothing, then fall back to a
  * select for the row that already exists" shape as queries/users.ts's
@@ -25,9 +40,10 @@ export interface InsertMatchInput {
  * `users_clerk_id_idx`. Two clip_views writes racing each other (one from
  * each side of a pair, both discovering mutual completion at nearly the
  * same moment) settle on the same single row rather than one of them
- * hitting a constraint-violation error.
+ * hitting a constraint-violation error — and `created` tells the loser of
+ * that race apart from the winner.
  */
-export async function insertMatchIfNotExists(db: AnyDb, input: InsertMatchInput): Promise<Match> {
+export async function insertMatchAndReportCreated(db: AnyDb, input: InsertMatchInput): Promise<InsertMatchResult> {
   const inserted = await db
     .insert(matches)
     .values({ userAId: input.userAId, userBId: input.userBId })
@@ -35,7 +51,7 @@ export async function insertMatchIfNotExists(db: AnyDb, input: InsertMatchInput)
     .returning();
 
   if (inserted[0]) {
-    return inserted[0];
+    return { match: inserted[0], created: true };
   }
 
   const [existing] = await db
@@ -47,10 +63,25 @@ export async function insertMatchIfNotExists(db: AnyDb, input: InsertMatchInput)
     // insert and this select — surfaces loudly rather than silently
     // returning undefined to the caller (mirrors ensureUserForClerkId).
     throw new Error(
-      `insertMatchIfNotExists: insert conflicted but no row was found for userAId=${input.userAId}, userBId=${input.userBId}`,
+      `insertMatchAndReportCreated: insert conflicted but no row was found for userAId=${input.userAId}, userBId=${input.userBId}`,
     );
   }
-  return existing;
+  return { match: existing, created: false };
+}
+
+/**
+ * Same insert as insertMatchAndReportCreated, minus the `created` flag —
+ * kept as a thin wrapper (rather than changing this function's own return
+ * type) so every existing caller across this codebase's test suite that
+ * only ever wanted "give me a match row for this pair, creating it if
+ * needed" (there are dozens — every other milestone's tests use this
+ * purely as fixture setup) keeps compiling unchanged. New callers that
+ * need to know whether a row was genuinely new (currently only
+ * check-and-create-match.ts) use insertMatchAndReportCreated directly.
+ */
+export async function insertMatchIfNotExists(db: AnyDb, input: InsertMatchInput): Promise<Match> {
+  const { match } = await insertMatchAndReportCreated(db, input);
+  return match;
 }
 
 /**

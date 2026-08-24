@@ -10,7 +10,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import * as schema from "../schema";
 import { ensureUserForClerkId } from "./users";
 import { ensurePromptsSeeded } from "./prompts";
-import { MatchNotFoundError, blockMatch, getActiveMatchesForUser, insertMatchIfNotExists } from "./matches";
+import {
+  MatchNotFoundError,
+  blockMatch,
+  getActiveMatchesForUser,
+  insertMatchAndReportCreated,
+  insertMatchIfNotExists,
+} from "./matches";
 
 const migrationsFolder = resolve(dirname(fileURLToPath(import.meta.url)), "../../drizzle");
 
@@ -54,6 +60,55 @@ describe("insertMatchIfNotExists", () => {
       .from(schema.matches)
       .where(and(eq(schema.matches.userAId, a.id), eq(schema.matches.userBId, b.id)));
     expect(rows).toHaveLength(1);
+  });
+});
+
+describe("insertMatchAndReportCreated", () => {
+  let client: PGlite;
+  let db: PgliteDatabase<typeof schema>;
+
+  beforeAll(async () => {
+    client = new PGlite();
+    db = drizzle(client, { schema });
+    await migrate(db, { migrationsFolder });
+    await ensurePromptsSeeded(db);
+  });
+
+  afterAll(async () => {
+    await client.close();
+  });
+
+  it("created=true on the first insert for a pair", async () => {
+    const a = await ensureUserForClerkId(db, "clerk_matches_created_flag_a");
+    const b = await ensureUserForClerkId(db, "clerk_matches_created_flag_b");
+
+    const result = await insertMatchAndReportCreated(db, { userAId: a.id, userBId: b.id });
+
+    expect(result.created).toBe(true);
+    expect(result.match.userAId).toBe(a.id);
+    expect(result.match.userBId).toBe(b.id);
+  });
+
+  it("created=false on a repeat call for a pair that already matched — ROADMAP.md M13's own match-notification trigger depends on this distinction", async () => {
+    const a = await ensureUserForClerkId(db, "clerk_matches_created_flag_repeat_a");
+    const b = await ensureUserForClerkId(db, "clerk_matches_created_flag_repeat_b");
+
+    const first = await insertMatchAndReportCreated(db, { userAId: a.id, userBId: b.id });
+    const second = await insertMatchAndReportCreated(db, { userAId: a.id, userBId: b.id });
+
+    expect(first.created).toBe(true);
+    expect(second.created).toBe(false);
+    expect(second.match.id).toBe(first.match.id);
+  });
+
+  it("insertMatchIfNotExists (the thin wrapper) still returns just the row, unchanged, for every existing caller", async () => {
+    const a = await ensureUserForClerkId(db, "clerk_matches_wrapper_a");
+    const b = await ensureUserForClerkId(db, "clerk_matches_wrapper_b");
+
+    const viaWrapper = await insertMatchIfNotExists(db, { userAId: a.id, userBId: b.id });
+    const viaFullFn = await insertMatchAndReportCreated(db, { userAId: a.id, userBId: b.id });
+
+    expect(viaWrapper.id).toBe(viaFullFn.match.id);
   });
 });
 

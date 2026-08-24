@@ -7,6 +7,7 @@ import { isValidSlotRange } from "@prompt-me/core";
 import { createGeneratedDateProposal, getGeneratedIdeaForMatch, type AnyDb, type DateProposal } from "@prompt-me/db";
 import { assertActiveMatchParticipant } from "../date-proposals/match-access";
 import { InvalidProposalSlotRangeError } from "../date-proposals/propose";
+import { notifyNewDateProposal } from "../notifications/notify-new-proposal";
 
 export class GeneratedIdeaNotFoundError extends Error {
   constructor(matchId: string, generatedIdeaId: string) {
@@ -51,7 +52,7 @@ export async function proposeGeneratedDate(
     throw new InvalidProposalSlotRangeError(input.slotStartAt, input.slotEndAt);
   }
 
-  return createGeneratedDateProposal(db, {
+  const proposal = await createGeneratedDateProposal(db, {
     matchId,
     proposedByUserId: proposerId,
     generatedIdeaId: idea.id,
@@ -59,4 +60,13 @@ export async function proposeGeneratedDate(
     slotStartAt: input.slotStartAt,
     slotEndAt: input.slotEndAt,
   });
+
+  // ENGINEERING_SPEC §14: "new date proposal" — SPEC.md draws no
+  // distinction between a custom-text proposal and a generated-idea one,
+  // so this fires the identical notification lib/date-proposals/propose.ts
+  // fires for its own path, rather than only the custom-text path
+  // remembering to.
+  await notifyNewDateProposal(db, proposal);
+
+  return proposal;
 }

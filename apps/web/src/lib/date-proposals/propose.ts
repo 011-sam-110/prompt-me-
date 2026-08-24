@@ -12,6 +12,7 @@
 // (M10, writes ideaSource: "generated" via createGeneratedDateProposal).
 import { isValidSlotRange } from "@prompt-me/core";
 import { createDateProposal, type AnyDb, type DateProposal } from "@prompt-me/db";
+import { notifyNewDateProposal } from "../notifications/notify-new-proposal";
 import { assertActiveMatchParticipant } from "./match-access";
 
 export class InvalidIdeaTextError extends Error {
@@ -64,11 +65,18 @@ export async function proposeDate(
     throw new InvalidProposalSlotRangeError(input.slotStartAt, input.slotEndAt);
   }
 
-  return createDateProposal(db, {
+  const proposal = await createDateProposal(db, {
     matchId,
     proposedByUserId: proposerId,
     ideaText,
     slotStartAt: input.slotStartAt,
     slotEndAt: input.slotEndAt,
   });
+
+  // ENGINEERING_SPEC §14: "new date proposal" — awaited, same "adapter
+  // failure propagates loudly" posture notify-new-match.ts's own header
+  // comment documents.
+  await notifyNewDateProposal(db, proposal);
+
+  return proposal;
 }

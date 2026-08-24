@@ -8,6 +8,7 @@
 // it atomically against a race (that module's own comment on
 // acceptDateProposal/declineDateProposal).
 import { acceptDateProposal, declineDateProposal, type AnyDb, type DateProposal } from "@prompt-me/db";
+import { notifyDateProposalAccepted } from "../notifications/notify-proposal-accepted";
 import { loadProposalForParticipant } from "./load-proposal";
 
 export class DateProposalSelfResponseError extends Error {
@@ -33,7 +34,16 @@ async function assertResponderIsNotProposer(proposal: DateProposal, responderId:
 export async function acceptDate(db: AnyDb, proposalId: string, responderId: string): Promise<DateProposal> {
   const proposal = await loadProposalForParticipant(db, proposalId, responderId);
   await assertResponderIsNotProposer(proposal, responderId);
-  return acceptDateProposal(db, proposalId);
+  const accepted = await acceptDateProposal(db, proposalId);
+
+  // ENGINEERING_SPEC §14: "proposal accepted" — awaited, same
+  // "adapter failure propagates loudly" posture
+  // lib/notifications/notify-new-match.ts's own header comment documents.
+  // Deliberately not fired from declineDate below — §14 names only
+  // "proposal accepted", not declined.
+  await notifyDateProposalAccepted(db, accepted);
+
+  return accepted;
 }
 
 /**

@@ -16,20 +16,29 @@
 // so the instant insertMatchIfNotExists below commits a row, M6's existing
 // candidate query starts excluding this pair on its own.
 //
-// One-directional completion never reaches insertMatchIfNotExists: both
-// hasCompletedAllClips calls below have to return true before this function
-// gets anywhere near creating a match, and it returns null the moment
-// either one doesn't — there is no path through this file that creates a
-// matches row from less than full completion on both sides.
+// One-directional completion never reaches insertMatchAndReportCreated:
+// both hasCompletedAllClips calls below have to return true before this
+// function gets anywhere near creating a match, and it returns null the
+// moment either one doesn't — there is no path through this file that
+// creates a matches row from less than full completion on both sides.
+//
+// ROADMAP.md M13 / ENGINEERING_SPEC §14: "new match" fires here, awaited,
+// but ONLY when insertMatchAndReportCreated reports `created: true` — a
+// repeat call for a pair that already matched (every later clip_views
+// write for the same pair keeps landing here, since recordClipViewPosition
+// never un-completes a row) must never re-send the email. See
+// notify-new-match.ts's own header comment for why this awaits rather than
+// fire-and-forgets.
 import { canonicalizeMatchPair, hasCompletedAllClips } from "@prompt-me/core";
 import {
   getClipIdsForUser,
   getCompletedClipIdsForViewerAndProfile,
-  insertMatchIfNotExists,
+  insertMatchAndReportCreated,
   type AnyDb,
   type ClipView,
   type Match,
 } from "@prompt-me/db";
+import { notifyNewMatch } from "../notifications/notify-new-match";
 
 /**
  * `clipView` is the row lib/clips/report-view-position.ts just wrote or
@@ -78,5 +87,9 @@ export async function checkAndCreateMatchIfMutual(db: AnyDb, clipView: ClipView)
   }
 
   const { userAId, userBId } = canonicalizeMatchPair(viewerId, profileUserId);
-  return insertMatchIfNotExists(db, { userAId, userBId });
+  const { match, created } = await insertMatchAndReportCreated(db, { userAId, userBId });
+  if (created) {
+    await notifyNewMatch(db, match);
+  }
+  return match;
 }

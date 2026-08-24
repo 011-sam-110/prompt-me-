@@ -5,7 +5,7 @@
 // call this (the moment a proposal becomes locked —
 // @prompt-me/core's isDateProposalLocked) — this file only turns an
 // already-decided window into SQL.
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { chatWindows, type ChatWindow } from "../schema/chat-windows";
 import type { AnyDb } from "../types";
 
@@ -78,4 +78,42 @@ export async function getChatWindowById(db: AnyDb, chatWindowId: string): Promis
 export async function getChatWindowByProposalId(db: AnyDb, dateProposalId: string): Promise<ChatWindow | undefined> {
   const [row] = await db.select().from(chatWindows).where(eq(chatWindows.dateProposalId, dateProposalId));
   return row;
+}
+
+/**
+ * ROADMAP.md M13 / ENGINEERING_SPEC §14: every chat_windows row that has
+ * never had its "opening in 15 minutes" reminder sent — mechanical only,
+ * same "no time filtering in SQL" split queries/feed.ts's own header
+ * comment documents for its 48h-resurfacing rule: whether any of these
+ * rows is actually DUE right now is @prompt-me/core's
+ * isChatWindowOpeningReminderDue's job, applied by the caller
+ * (apps/web/src/lib/notifications/notify-chat-window-opening.ts's
+ * sendDueChatWindowOpeningReminders), not this query's. A row already past
+ * its opens_at with no reminder ever sent is deliberately still returned
+ * here — isChatWindowOpeningReminderDue itself is what correctly treats an
+ * already-opened window as no-longer-due, so it's harmless (and simpler)
+ * to let this query stay a single unconditional filter rather than
+ * duplicating that boundary in SQL too.
+ */
+export async function getChatWindowsPendingOpeningReminder(db: AnyDb): Promise<ChatWindow[]> {
+  return db.select().from(chatWindows).where(isNull(chatWindows.reminderSentAt));
+}
+
+/**
+ * Marks one chat_windows row's reminder as sent — the write that makes
+ * getChatWindowsPendingOpeningReminder stop returning it, and the write
+ * that guarantees sendDueChatWindowOpeningReminders never sends the same
+ * window's "opening in 15 minutes" email twice, even across overlapping or
+ * retried polls.
+ */
+export async function markChatWindowReminderSent(db: AnyDb, chatWindowId: string, sentAt: Date): Promise<ChatWindow> {
+  const [updated] = await db
+    .update(chatWindows)
+    .set({ reminderSentAt: sentAt })
+    .where(eq(chatWindows.id, chatWindowId))
+    .returning();
+  if (!updated) {
+    throw new Error(`markChatWindowReminderSent: no chat_windows row found for id=${chatWindowId}`);
+  }
+  return updated;
 }

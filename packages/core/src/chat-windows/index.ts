@@ -10,3 +10,8 @@ export {
   type ChatSendAccessDecision,
 } from "./window";
 export { CHAT_MESSAGE_EVENT, chatWindowChannelName } from "./channel";
+export {
+  CHAT_WINDOW_OPENING_REMINDER_LEAD_MINUTES,
+  isChatWindowOpeningReminderDue,
+  type ChatWindowReminderCandidate,
+} from "./opening-reminder";
