@@ -5,4 +5,5 @@ export * from "./users";
 export * from "./verification";
 export * from "./prompts";
 export * from "./clips";
+export * from "./clip-views";
 export * from "./moderation";

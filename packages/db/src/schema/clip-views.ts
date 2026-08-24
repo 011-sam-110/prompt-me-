@@ -31,3 +31,6 @@ export const clipViews = pgTable(
   },
   (table) => [uniqueIndex("clip_views_viewer_clip_idx").on(table.viewerId, table.clipId)],
 );
+
+export type ClipView = typeof clipViews.$inferSelect;
+export type NewClipView = typeof clipViews.$inferInsert;

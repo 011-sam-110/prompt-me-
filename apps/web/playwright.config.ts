@@ -54,6 +54,13 @@ export default defineConfig({
       CLERK_WEBHOOK_SECRET: "",
       DATABASE_URL: "",
       DIDIT_API_KEY: "",
+      // next.config.ts: keeps this server's build/cache directory separate
+      // from any other `next dev` that might be running against this same
+      // app concurrently (this repo's autonomous build can have more than
+      // one agent's dev server up at once) — two processes sharing one
+      // `.next/` corrupt each other's compiles rather than erroring
+      // loudly, which otherwise shows up here as an inexplicable hang.
+      NEXT_DIST_DIR: ".next-playwright",
     },
   },
 });

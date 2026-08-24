@@ -15,6 +15,12 @@ const eslintConfig = [
     ignores: [
       "node_modules/**",
       ".next/**",
+      // next.config.ts: playwright.config.ts's webServer runs with its own
+      // isolated build dir (NEXT_DIST_DIR) so it never shares one with
+      // another `next dev` that might be running against this same app —
+      // its generated route-type files land here and need the same
+      // exclusion `.next/**` already gets.
+      ".next-playwright/**",
       "out/**",
       "build/**",
       "next-env.d.ts",

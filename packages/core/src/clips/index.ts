@@ -18,3 +18,11 @@ export {
   type ResolvedPromptForValidation,
 } from "./prompt-selection";
 export { probeClipDurationSeconds, ClipDurationProbeError } from "./duration-probe";
+export {
+  COMPLETION_POSITION_TOLERANCE_SECONDS,
+  SCROLL_LOCK_SECONDS,
+  hasReachedClipEnd,
+  hasClearedScrollLock,
+  clampSeekTarget,
+} from "./playback";
+export { sniffMediaContentType } from "./media-content-type";
