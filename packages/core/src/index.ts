@@ -19,3 +19,4 @@ export * from "./frame-sampling";
 export * from "./location";
 export * from "./feed";
 export * from "./matches";
+export * from "./rewatch";

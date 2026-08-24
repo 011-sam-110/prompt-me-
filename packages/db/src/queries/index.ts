@@ -10,3 +10,4 @@ export * from "./moderation";
 export * from "./location";
 export * from "./feed";
 export * from "./matches";
+export * from "./rewatch-sessions";

@@ -136,3 +136,18 @@ export async function getActiveMatchesForUser(db: AnyDb, userId: string): Promis
     .from(matches)
     .where(and(eq(matches.status, "active"), or(eq(matches.userAId, userId), eq(matches.userBId, userId))));
 }
+
+/**
+ * A single `matches` row by its own id, regardless of status —
+ * apps/web's lib/rewatch/request-rewatch-access.ts (ROADMAP M8) uses this
+ * to confirm the acting viewer is actually a participant in the match
+ * they're requesting a rewatch session for, before touching
+ * rewatch_sessions at all. Deliberately not filtered to `status = "active"`
+ * the way getActiveMatchesForUser is — ENGINEERING_SPEC §8 doesn't gate
+ * rewatch on match status, only on the rewatch_sessions clock, so this
+ * stays a plain lookup and leaves that policy question to the caller.
+ */
+export async function getMatchById(db: AnyDb, matchId: string): Promise<Match | undefined> {
+  const [row] = await db.select().from(matches).where(eq(matches.id, matchId));
+  return row;
+}

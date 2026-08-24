@@ -20,3 +20,6 @@ export const rewatchSessions = pgTable("rewatch_sessions", {
     .defaultNow(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
 });
+
+export type RewatchSession = typeof rewatchSessions.$inferSelect;
+export type NewRewatchSession = typeof rewatchSessions.$inferInsert;
