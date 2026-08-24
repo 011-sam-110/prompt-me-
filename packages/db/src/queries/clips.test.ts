@@ -12,6 +12,7 @@ import { ensurePromptsSeeded, getActivePromptsForTier } from "./prompts";
 import {
   getClipById,
   getClipForUserAndTier,
+  getClipsForUserInUploadOrder,
   getClipTiersForUser,
   insertClip,
   updateClipModerationStatus,
@@ -156,6 +157,49 @@ describe("clips queries", () => {
       await expect(
         updateClipTranscript(db, "00000000-0000-0000-0000-000000000000", "x"),
       ).rejects.toThrow(/no clip found/);
+    });
+  });
+
+  describe("getClipsForUserInUploadOrder", () => {
+    it("is empty for a user with no clips", async () => {
+      const user = await ensureUserForClerkId(db, "clerk_clips_nav_empty");
+      expect(await getClipsForUserInUploadOrder(db, user.id)).toEqual([]);
+    });
+
+    it("orders by tier ascending regardless of insert order — SPEC.md §3's 'upload order'", async () => {
+      const user = await ensureUserForClerkId(db, "clerk_clips_nav_order");
+      const tier2 = await insertClip(db, {
+        userId: user.id,
+        tier: 2,
+        durationSeconds: 30,
+        storageUrl: "dev-blob://nav/tier-2.webm",
+        customPromptText: "tier 2",
+      });
+      const tier1 = await insertClip(db, {
+        userId: user.id,
+        tier: 1,
+        durationSeconds: 15,
+        storageUrl: "dev-blob://nav/tier-1.wav",
+        customPromptText: "tier 1",
+      });
+
+      const stack = await getClipsForUserInUploadOrder(db, user.id);
+      expect(stack.map((clip) => clip.id)).toEqual([tier1.id, tier2.id]);
+      expect(stack.map((clip) => clip.tier)).toEqual([1, 2]);
+    });
+
+    it("never returns another user's clips", async () => {
+      const userA = await ensureUserForClerkId(db, "clerk_clips_nav_a");
+      const userB = await ensureUserForClerkId(db, "clerk_clips_nav_b");
+      await insertClip(db, {
+        userId: userA.id,
+        tier: 1,
+        durationSeconds: 15,
+        storageUrl: "dev-blob://nav/a-tier-1.wav",
+        customPromptText: "a",
+      });
+
+      expect(await getClipsForUserInUploadOrder(db, userB.id)).toEqual([]);
     });
   });
 });

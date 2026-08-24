@@ -40,6 +40,13 @@ export interface ClipPlayerProps {
    * container (components/player/scroll-lock-container.tsx) can actually
    * block/allow the vertical "pass" gesture. */
   onScrollLockChange?: (locked: boolean) => void;
+  /** Notified whenever this clip's server-reported completion changes —
+   * never fired from a locally-computed guess, only from whatever
+   * submitClipViewPosition's response actually said (see `reportPosition`
+   * below). A wrapping clip-stack shell (clip-stack-nav.tsx) uses this to
+   * decide how far SPEC.md §3's lateral "move between one candidate's own
+   * clips" gesture may reach (@prompt-me/core's maxUnlockedClipIndex). */
+  onCompletedChange?: (completed: boolean) => void;
 }
 
 /** Reports at most this often while playing — a report on every single
@@ -60,6 +67,7 @@ export function ClipPlayer({
   format,
   isFirstClip,
   onScrollLockChange,
+  onCompletedChange,
 }: ClipPlayerProps) {
   const mediaRef = useRef<MediaEl>(null);
   const maxReachedSecondsRef = useRef(0);
@@ -112,6 +120,16 @@ export function ClipPlayer({
   useEffect(() => {
     onScrollLockChange?.(locked);
   }, [locked, onScrollLockChange]);
+
+  // Same rationale as the effect above, for the same React-antipattern
+  // reason: `completed` only ever changes inside reportPosition's
+  // `.then()` callback (never during render), so this is already safe to
+  // call directly there too — but routing it through an effect keeps both
+  // "notify a parent about my own state" cases identical and lets a fresh
+  // reader see the pattern once rather than wonder why one path differs.
+  useEffect(() => {
+    onCompletedChange?.(completed);
+  }, [completed, onCompletedChange]);
 
   function handleTimeUpdate() {
     const el = mediaRef.current;

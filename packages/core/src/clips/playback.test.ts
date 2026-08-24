@@ -6,9 +6,11 @@ import { describe, expect, it } from "vitest";
 import {
   COMPLETION_POSITION_TOLERANCE_SECONDS,
   SCROLL_LOCK_SECONDS,
+  clampLateralIndex,
   clampSeekTarget,
   hasClearedScrollLock,
   hasReachedClipEnd,
+  maxUnlockedClipIndex,
 } from "./playback";
 
 describe("hasReachedClipEnd", () => {
@@ -78,5 +80,53 @@ describe("clampSeekTarget", () => {
   it("clamps non-finite requested input to 0 rather than treating it as an unbounded forward seek", () => {
     expect(clampSeekTarget(Number.NaN, 10)).toBe(0);
     expect(clampSeekTarget(Infinity, 10)).toBe(0);
+  });
+});
+
+describe("maxUnlockedClipIndex", () => {
+  it("is 0 for an empty stack (nothing to unlock)", () => {
+    expect(maxUnlockedClipIndex([])).toBe(0);
+  });
+
+  it("is 0 for a single-clip stack, completed or not — there's nothing further to reach", () => {
+    expect(maxUnlockedClipIndex([false])).toBe(0);
+    expect(maxUnlockedClipIndex([true])).toBe(0);
+  });
+
+  it("stays at 0 until clip 0 is completed", () => {
+    expect(maxUnlockedClipIndex([false, false, false])).toBe(0);
+  });
+
+  it("advances to the first not-yet-completed clip", () => {
+    expect(maxUnlockedClipIndex([true, false, false])).toBe(1);
+    expect(maxUnlockedClipIndex([true, true, false])).toBe(2);
+  });
+
+  it("caps at the last index once every clip is completed", () => {
+    expect(maxUnlockedClipIndex([true, true, true, true])).toBe(3);
+  });
+
+  it("never trusts a later `true` to skip an earlier gap — completion must be contiguous from the start", () => {
+    // A malformed/adversarial input (clip 1 marked complete while clip 0
+    // isn't) shouldn't let navigation past clip 0 anyway; the loop simply
+    // stops at the first false it finds, from the front.
+    expect(maxUnlockedClipIndex([false, true, true])).toBe(0);
+  });
+});
+
+describe("clampLateralIndex", () => {
+  it("allows backward navigation to any already-unlocked clip", () => {
+    expect(clampLateralIndex(0, [true, true, false])).toBe(0);
+    expect(clampLateralIndex(1, [true, true, false])).toBe(1);
+  });
+
+  it("clamps a forward request past the gate down to the furthest unlocked clip", () => {
+    expect(clampLateralIndex(3, [true, false, false, false])).toBe(1);
+    expect(clampLateralIndex(5, [true, true, false])).toBe(2);
+  });
+
+  it("clamps a negative or non-finite request to 0", () => {
+    expect(clampLateralIndex(-1, [true, true])).toBe(0);
+    expect(clampLateralIndex(Number.NaN, [true, true])).toBe(0);
   });
 });

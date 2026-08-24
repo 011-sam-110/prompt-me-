@@ -8,12 +8,12 @@
 // played for the M2/M3 onboarding gate before M6 replaced it with the real
 // thing.
 import { notFound, redirect } from "next/navigation";
-import { getClipById } from "@prompt-me/db";
-import { CLIP_TIER_SPECS, isValidClipTier } from "@prompt-me/core";
+import { getClipById, getClipsForUserInUploadOrder } from "@prompt-me/db";
+import { CLIP_TIER_SPECS, isValidClipTier, type ClipTier } from "@prompt-me/core";
 import { getAppDb } from "@/lib/db";
 import { getAuthSession } from "@/lib/auth/session";
 import { resolveClipMediaUrl } from "@/lib/clips/media-url";
-import { ClipPlaybackDemo } from "@/components/player/clip-playback-demo";
+import { ClipStackNav, type ClipStackNavClip } from "@/components/player/clip-stack-nav";
 
 export default async function ClipPlayerPage({
   params,
@@ -32,19 +32,25 @@ export default async function ClipPlayerPage({
     notFound();
   }
 
-  const format = CLIP_TIER_SPECS[clip.tier].format;
-  const mediaUrl = resolveClipMediaUrl(clip);
+  // SPEC.md §3: lateral scroll moves between *this profile's own* clips,
+  // in upload order — so the harness loads the whole stack the requested
+  // clip belongs to (its owner's uploads), not just the one clip id in the
+  // URL. Which *viewer* may reach this profile at all is still M6/M7's
+  // job, unchanged from the original M5 scope note.
+  const stack = await getClipsForUserInUploadOrder(db, clip.userId);
+  const clipsForNav: ClipStackNavClip[] = stack
+    .filter((row): row is typeof row & { tier: ClipTier } => isValidClipTier(row.tier))
+    .map((row) => ({
+      clipId: row.id,
+      mediaUrl: resolveClipMediaUrl(row),
+      durationSeconds: row.durationSeconds,
+      format: CLIP_TIER_SPECS[row.tier].format,
+    }));
 
   return (
     <main className="mx-auto flex min-h-screen max-w-lg flex-col items-center gap-6 px-6 py-10">
       <h1 className="text-xl font-semibold">Clip playback</h1>
-      <ClipPlaybackDemo
-        clipId={clip.id}
-        mediaUrl={mediaUrl}
-        durationSeconds={clip.durationSeconds}
-        format={format}
-        isFirstClip={clip.tier === 1}
-      />
+      <ClipStackNav clips={clipsForNav} />
     </main>
   );
 }

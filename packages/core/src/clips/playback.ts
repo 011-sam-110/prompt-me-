@@ -4,6 +4,12 @@
 // (§15) — apps/web's ClipPlayer component and lib/clips/report-view-position.ts
 // are the only callers that touch a real <video>/<audio> element or a
 // database row.
+//
+// Two independent gestures live here, per SPEC.md §3: the *vertical* "pass"
+// gesture between candidates (hasClearedScrollLock — timeline position on
+// clip 1 only), and the *lateral* gesture between one candidate's own clips
+// (maxUnlockedClipIndex/clampLateralIndex — server-reported completion, any
+// clip). Neither gate depends on the other.
 
 /**
  * ENGINEERING_SPEC §5: completion is reported "to the server on
@@ -76,4 +82,48 @@ export function clampSeekTarget(requestedSeconds: number, maxReachedSeconds: num
     return 0;
   }
   return Math.min(requestedSeconds, maxReachedSeconds);
+}
+
+/**
+ * SPEC.md §3: "Lateral scroll = move between one candidate's own clips, in
+ * upload order" — and the thesis's central rule, restated twice in SPEC.md
+ * ("nothing can be skipped", §1; "each clip must finish before the next
+ * unlocks... jumping to a later clip is not [allowed]", §3). The vertical
+ * scroll-lock above (`hasClearedScrollLock`) only ever gates clip 1's
+ * "pass" gesture for 5 seconds; this is the *other* gate SPEC.md §3
+ * describes — moving laterally within one profile's own clip stack — and it
+ * has nothing to do with wall-clock or timeline position at all: it's
+ * gated purely on which earlier clips the server has already reported as
+ * complete (the same `completed` boolean ClipPlayer already only ever sets
+ * from the server's own response, never a local guess — see
+ * report-view-position.ts).
+ *
+ * `completed[i]` is true once clip *i* (0-indexed, upload order) has been
+ * fully watched. The furthest clip reachable is the first one *not yet*
+ * completed — you can always be sitting on it, you just can't skip past it
+ * to a later one before it finishes.
+ */
+export function maxUnlockedClipIndex(completed: readonly boolean[]): number {
+  if (completed.length === 0) {
+    return 0;
+  }
+  let index = 0;
+  while (index < completed.length - 1 && completed[index]) {
+    index += 1;
+  }
+  return index;
+}
+
+/**
+ * Clamps a requested lateral navigation target (e.g. where a horizontal
+ * scroll gesture would land) to `maxUnlockedClipIndex`. Backward navigation
+ * — revisiting an earlier, already-unlocked clip — is always allowed
+ * (SPEC.md §3: "Rewind/replay is free"); only a *forward* jump past the
+ * gate gets pulled back.
+ */
+export function clampLateralIndex(requestedIndex: number, completed: readonly boolean[]): number {
+  if (!Number.isFinite(requestedIndex) || requestedIndex < 0) {
+    return 0;
+  }
+  return Math.min(requestedIndex, maxUnlockedClipIndex(completed));
 }

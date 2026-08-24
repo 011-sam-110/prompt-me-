@@ -4,7 +4,7 @@
 // with these queries by apps/web/src/lib/clips/upload.ts, mirroring how
 // run-check.ts composes @prompt-me/core's verification adapter with
 // queries/verification.ts.
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { clips, type Clip, type ModerationStatus } from "../schema/clips";
 import type { AnyDb } from "../types";
 
@@ -34,6 +34,21 @@ export async function getClipForUserAndTier(
 export async function getClipById(db: AnyDb, clipId: string): Promise<Clip | undefined> {
   const [row] = await db.select().from(clips).where(eq(clips.id, clipId));
   return row;
+}
+
+/**
+ * SPEC.md §3: "Lateral scroll = move between one candidate's own clips, in
+ * upload order." Ordered by `tier` ascending rather than `created_at`: the
+ * upload dependency chain (`checkTierDependency`, §2 — clip N+1 can't be
+ * uploaded before clip N exists) already forces tier order and upload order
+ * to coincide for any given user, and the schema's own
+ * `unique(user_id, tier)` constraint (schema/clips.ts) means there's at
+ * most one row per tier to order in the first place — sorting on the
+ * column the domain rule actually pins is more direct than trusting a
+ * timestamp to agree with it.
+ */
+export async function getClipsForUserInUploadOrder(db: AnyDb, userId: string): Promise<Clip[]> {
+  return db.select().from(clips).where(eq(clips.userId, userId)).orderBy(asc(clips.tier));
 }
 
 export interface InsertClipInput {

@@ -24,5 +24,7 @@ export {
   hasReachedClipEnd,
   hasClearedScrollLock,
   clampSeekTarget,
+  maxUnlockedClipIndex,
+  clampLateralIndex,
 } from "./playback";
 export { sniffMediaContentType } from "./media-content-type";
