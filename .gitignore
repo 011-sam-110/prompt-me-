@@ -1,0 +1,22 @@
+# dependencies (root-level, hoisted across the npm workspace)
+node_modules/
+**/node_modules/
+
+# build outputs
+dist/
+**/dist/
+*.tsbuildinfo
+
+# env files — never commit real credentials
+.env
+.env.*
+!.env.example
+
+# editor/OS cruft
+.DS_Store
+
+# vercel
+.vercel
+
+# test/coverage
+coverage/

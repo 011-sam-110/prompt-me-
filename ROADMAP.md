@@ -3,14 +3,14 @@
 Milestones for Round 1 (`LOOP.md`). One milestone = one buildable, gated, testable slice. Built in dependency order; within a milestone, independent sub-parts may be split across parallel agents.
 
 ### M1: Monorepo scaffold & data model
-Status: [ ]
+Status: [x] done (2026-08-24, PENDING_HASH)
 Depends on: —
 Spec: ENGINEERING_SPEC.md §1, §2
 Acceptance:
-- [ ] `apps/web` (Next.js 15 + TS + Tailwind + shadcn/ui), `packages/core`, `packages/db` exist and build.
-- [ ] Drizzle schema for every table in ENGINEERING_SPEC.md §2 exists, migrates cleanly against a local/dev Postgres.
-- [ ] `npm run typecheck && npm run lint && npm run test -- --run` all pass on an empty-but-real app shell.
-- [ ] README documents local dev setup (env vars, DB migrate command).
+- [x] `apps/web` (Next.js 15 + TS + Tailwind + shadcn/ui), `packages/core`, `packages/db` exist and build.
+- [x] Drizzle schema for every table in ENGINEERING_SPEC.md §2 exists, migrates cleanly against a local/dev Postgres.
+- [x] `npm run typecheck && npm run lint && npm run test -- --run` all pass on an empty-but-real app shell.
+- [x] README documents local dev setup (env vars, DB migrate command).
 
 ### M2: Auth & onboarding shell
 Status: [ ]
@@ -141,3 +141,5 @@ Real credentials required before each milestone can run against live services (a
 ## Build log
 
 (Appended one line per milestone as Round 1 completes it — see LOOP.md.)
+
+- **M1** (2026-08-24, PENDING_HASH): npm-workspaces monorepo scaffolded (`apps/web` Next.js 15/App Router/TS/Tailwind v4/shadcn-ui, `packages/core`, `packages/db`); Drizzle schema for all 15 ENGINEERING_SPEC.md §2 tables with every FK/CHECK/UNIQUE/enum/cascade rule; generated migration verified against a real embedded Postgres (`@electric-sql/pglite`) in `packages/db/src/schema/schema.test.ts` (36 tests, all green) since no live Neon string exists yet; `getDb()` lazily reads `DATABASE_URL` so a missing credential never blocks typecheck/lint/test/build; `next build` succeeds; README documents env vars + migrate commands.
