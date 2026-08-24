@@ -12,3 +12,4 @@ export * from "./feed";
 export * from "./matches";
 export * from "./rewatch-sessions";
 export * from "./calendar-slots";
+export * from "./date-proposals";

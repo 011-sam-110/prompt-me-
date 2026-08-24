@@ -54,3 +54,6 @@ export const dateProposals = pgTable(
     ),
   ],
 );
+
+export type DateProposal = typeof dateProposals.$inferSelect;
+export type NewDateProposal = typeof dateProposals.$inferInsert;

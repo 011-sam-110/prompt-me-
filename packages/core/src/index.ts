@@ -21,3 +21,5 @@ export * from "./feed";
 export * from "./matches";
 export * from "./rewatch";
 export * from "./calendar";
+export * from "./places";
+export * from "./date-proposals";

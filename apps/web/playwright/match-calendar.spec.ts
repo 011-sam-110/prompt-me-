@@ -128,23 +128,29 @@ test("busy/available calendar is editable for self, read-only for the match, and
   const partnerSlotsA = pageA.locator('[data-testid="partner-calendar-slots"]');
   await expect(partnerSlotsA).toContainText("They haven't added any times yet.");
 
+  // Scoped to the add-slot form specifically — ROADMAP.md M9's proposal
+  // half added its own "Start"/"End"-labeled fields lower on this same
+  // page (components/date-proposals/propose-form.tsx), so an unscoped
+  // getByLabel("Start") is ambiguous now.
+  const addSlotFormA = pageA.locator('[data-testid="add-calendar-slot-form"]');
+
   // Add a busy slot to A's own calendar (default status is "busy" — see
   // OwnCalendarEditor's initial state).
-  await pageA.getByLabel("Start").fill("2026-09-10T09:00");
-  await pageA.getByLabel("End").fill("2026-09-10T10:00");
+  await addSlotFormA.getByLabel("Start").fill("2026-09-10T09:00");
+  await addSlotFormA.getByLabel("End").fill("2026-09-10T10:00");
   await pageA.getByRole("button", { name: "Add to calendar" }).click();
   await expect(ownSlotsA.locator("li")).toHaveCount(1);
   await expect(ownSlotsA.locator("li")).toHaveAttribute("data-slot-status", "busy");
 
   // The overlap guard (packages/core/src/calendar/slots.ts), through the
   // real form: a second, overlapping range is rejected and never added.
-  await pageA.getByLabel("Start").fill("2026-09-10T09:30");
-  await pageA.getByLabel("End").fill("2026-09-10T11:00");
+  await addSlotFormA.getByLabel("Start").fill("2026-09-10T09:30");
+  await addSlotFormA.getByLabel("End").fill("2026-09-10T11:00");
   await pageA.getByRole("button", { name: "Add to calendar" }).click();
   // Scoped to the add-slot form's own alert — Next.js's route announcer
   // (#__next-route-announcer__) also carries role="alert" and would
   // otherwise make this locator ambiguous.
-  await expect(pageA.locator('form p[role="alert"]')).toContainText("overlap");
+  await expect(addSlotFormA.locator('p[role="alert"]')).toContainText("overlap");
   await expect(ownSlotsA.locator("li")).toHaveCount(1);
 
   await pageA.screenshot({ path: resolve(shotsDir, "m9-02-own-calendar-editable.png") });
@@ -162,8 +168,9 @@ test("busy/available calendar is editable for self, read-only for the match, and
   // Read-only: no "Remove" control on the partner's own entries.
   await expect(partnerSlotsB.locator("button", { hasText: "Remove" })).toHaveCount(0);
 
-  await pageB.getByLabel("Start").fill("2026-09-11T14:00");
-  await pageB.getByLabel("End").fill("2026-09-11T15:00");
+  const addSlotFormB = pageB.locator('[data-testid="add-calendar-slot-form"]');
+  await addSlotFormB.getByLabel("Start").fill("2026-09-11T14:00");
+  await addSlotFormB.getByLabel("End").fill("2026-09-11T15:00");
   await pageB.getByRole("radio", { name: "Available" }).check();
   await pageB.getByRole("button", { name: "Add to calendar" }).click();
   await expect(ownSlotsB.locator("li")).toHaveCount(1);

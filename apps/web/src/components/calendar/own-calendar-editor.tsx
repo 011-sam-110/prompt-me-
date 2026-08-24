@@ -84,7 +84,11 @@ export function OwnCalendarEditor({ initialSlots }: { initialSlots: CalendarSlot
         testId="own-calendar-slots"
       />
 
-      <form onSubmit={submitAdd} className="flex flex-col gap-2 rounded-lg border border-border p-3">
+      <form
+        onSubmit={submitAdd}
+        data-testid="add-calendar-slot-form"
+        className="flex flex-col gap-2 rounded-lg border border-border p-3"
+      >
         <div className="flex flex-col gap-2 sm:flex-row">
           <label className="flex flex-1 flex-col gap-1 text-xs text-muted-foreground">
             Start

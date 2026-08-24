@@ -6,12 +6,21 @@
 "use client";
 import type { CalendarSlot } from "@prompt-me/db";
 
-const dateFormatter = new Intl.DateTimeFormat(undefined, {
+// Locale pinned explicitly (not `undefined`, which resolves to whatever
+// locale the running environment defaults to) — this component is
+// server-rendered first (Next.js SSRs a "use client" component's initial
+// HTML too) and then hydrated in the browser; an unpinned locale lets the
+// server process's own default locale disagree with the browser's, which
+// produces two different date strings for the same Date and trips a React
+// hydration-mismatch error (observed 2026-08-24 building
+// components/date-proposals/proposal-list.tsx, which copies this exact
+// formatter pattern — see that file's own comment).
+const dateFormatter = new Intl.DateTimeFormat("en-GB", {
   weekday: "short",
   month: "short",
   day: "numeric",
 });
-const timeFormatter = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
+const timeFormatter = new Intl.DateTimeFormat("en-GB", { hour: "numeric", minute: "2-digit" });
 
 function formatRange(startAt: Date, endAt: Date): string {
   return `${dateFormatter.format(startAt)}, ${timeFormatter.format(startAt)}–${timeFormatter.format(endAt)}`;
