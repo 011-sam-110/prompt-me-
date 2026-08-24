@@ -43,4 +43,14 @@ export class VercelBlobStorageAdapter implements ClipStorageAdapter {
     });
     return { url: blob.url };
   }
+
+  async download(url: string): Promise<Uint8Array> {
+    // Uploaded with `access: "public"` (see upload() above), so a plain
+    // GET needs no auth token to read the bytes back.
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`VercelBlobStorageAdapter.download failed: ${response.status} ${response.statusText}`);
+    }
+    return new Uint8Array(await response.arrayBuffer());
+  }
 }

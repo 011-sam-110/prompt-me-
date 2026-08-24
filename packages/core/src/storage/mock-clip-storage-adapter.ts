@@ -45,6 +45,13 @@ export class MockClipStorageAdapter implements ClipStorageAdapter {
     await writeFile(filePath, input.data);
     return { url: `${MOCK_BLOB_URL_SCHEME}${input.key}` };
   }
+
+  async download(url: string): Promise<Uint8Array> {
+    if (!url.startsWith(MOCK_BLOB_URL_SCHEME)) {
+      throw new Error(`MockClipStorageAdapter.download: not a ${MOCK_BLOB_URL_SCHEME} URL: ${url}`);
+    }
+    return readMockClipBytes(url.slice(MOCK_BLOB_URL_SCHEME.length));
+  }
 }
 
 /**

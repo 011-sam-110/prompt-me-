@@ -3,7 +3,7 @@
 // store — proves this adapter calls it with the right shape (token,
 // access, contentType, the exact bytes) and maps its result to
 // ClipStorageUploadResult, without depending on network access.
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const putMock = vi.fn();
 vi.mock("@vercel/blob", () => ({
@@ -33,5 +33,27 @@ describe("VercelBlobStorageAdapter", () => {
       multipart: true,
     });
     expect(result).toEqual({ url: "https://example.public.blob.vercel-storage.com/clips/abc.webm" });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("download() GETs the URL with no auth header (the blob is public) and returns its bytes", async () => {
+    const bytes = new Uint8Array([1, 2, 3, 4]);
+    const fetchMock = vi.fn().mockResolvedValue(new Response(bytes));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const adapter = new VercelBlobStorageAdapter({ token: "test-token" });
+    const result = await adapter.download("https://example.public.blob.vercel-storage.com/clips/abc.webm");
+
+    expect(fetchMock).toHaveBeenCalledWith("https://example.public.blob.vercel-storage.com/clips/abc.webm");
+    expect(Array.from(result)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("download() throws on a non-ok response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("nope", { status: 404, statusText: "Not Found" })));
+    const adapter = new VercelBlobStorageAdapter({ token: "test-token" });
+    await expect(adapter.download("https://example.test/missing")).rejects.toThrow(/404/);
   });
 });

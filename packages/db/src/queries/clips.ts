@@ -5,7 +5,7 @@
 // run-check.ts composes @prompt-me/core's verification adapter with
 // queries/verification.ts.
 import { and, eq } from "drizzle-orm";
-import { clips, type Clip } from "../schema/clips";
+import { clips, type Clip, type ModerationStatus } from "../schema/clips";
 import type { AnyDb } from "../types";
 
 /** Every tier this user has already uploaded a clip for — the input
@@ -25,6 +25,14 @@ export async function getClipForUserAndTier(
     .select()
     .from(clips)
     .where(and(eq(clips.userId, userId), eq(clips.tier, tier)));
+  return row;
+}
+
+/** ENGINEERING_SPEC §4/§12's async post-upload step (apps/web's
+ * process-clip.ts) looks a clip back up by id to run transcription +
+ * moderation against it. */
+export async function getClipById(db: AnyDb, clipId: string): Promise<Clip | undefined> {
+  const [row] = await db.select().from(clips).where(eq(clips.id, clipId));
   return row;
 }
 
@@ -63,6 +71,41 @@ export async function insertClip(db: AnyDb, input: InsertClipInput): Promise<Cli
 
   if (!row) {
     throw new Error(`insertClip: insert returned no row for userId=${input.userId}`);
+  }
+  return row;
+}
+
+/**
+ * Writes the Whisper transcription result — ENGINEERING_SPEC §4's async
+ * post-upload step. Doesn't touch `moderation_status` at all: the caller
+ * (apps/web's process-clip.ts) decides that separately once moderation
+ * has also run, via `updateClipModerationStatus` below.
+ */
+export async function updateClipTranscript(db: AnyDb, clipId: string, transcript: string): Promise<Clip> {
+  const [row] = await db.update(clips).set({ transcript }).where(eq(clips.id, clipId)).returning();
+  if (!row) {
+    throw new Error(`updateClipTranscript: no clip found for id=${clipId}`);
+  }
+  return row;
+}
+
+/**
+ * Flips `moderation_status` — ENGINEERING_SPEC §12: "approved" only once
+ * transcript + sampled-frame moderation both come back clean, otherwise
+ * "pending_review". A plain field update, not a state-machine check here:
+ * ENGINEERING_SPEC's transition rule lives in apps/web's process-clip.ts,
+ * which decides *which* status to pass in; this function just persists
+ * whatever it's told, the same "mechanical data access only" split
+ * clips.ts already draws elsewhere in this file.
+ */
+export async function updateClipModerationStatus(
+  db: AnyDb,
+  clipId: string,
+  moderationStatus: ModerationStatus,
+): Promise<Clip> {
+  const [row] = await db.update(clips).set({ moderationStatus }).where(eq(clips.id, clipId)).returning();
+  if (!row) {
+    throw new Error(`updateClipModerationStatus: no clip found for id=${clipId}`);
   }
   return row;
 }

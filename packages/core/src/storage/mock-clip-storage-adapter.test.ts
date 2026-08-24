@@ -40,4 +40,21 @@ describe("MockClipStorageAdapter", () => {
       adapter.upload({ key: "../../escape.bin", data: new Uint8Array([1]), contentType: "text/plain" }),
     ).rejects.toThrow(/unsafe storage key/);
   });
+
+  it("download() reads back exactly what upload() wrote, given the returned URL", async () => {
+    const adapter = new MockClipStorageAdapter();
+    const key = `test/${randomUUID()}.bin`;
+    const data = new Uint8Array([7, 8, 9]);
+
+    const { url } = await adapter.upload({ key, data, contentType: "application/octet-stream" });
+    const readBack = await adapter.download(url);
+    expect(Array.from(readBack)).toEqual([7, 8, 9]);
+  });
+
+  it("download() rejects a URL that isn't a dev-blob:// URL", async () => {
+    const adapter = new MockClipStorageAdapter();
+    await expect(adapter.download("https://example.com/not-a-mock-url")).rejects.toThrow(
+      /not a dev-blob:\/\/ URL/,
+    );
+  });
 });

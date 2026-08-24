@@ -69,3 +69,7 @@ export const clips = pgTable(
 
 export type Clip = typeof clips.$inferSelect;
 export type NewClip = typeof clips.$inferInsert;
+/** The literal union drizzle infers for the `moderation_status` pg enum
+ * column — named here so queries/clips.ts's status-transition functions
+ * (ENGINEERING_SPEC §4/§12) don't have to restate the enum's four values. */
+export type ModerationStatus = Clip["moderationStatus"];

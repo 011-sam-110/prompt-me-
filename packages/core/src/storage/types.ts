@@ -20,4 +20,12 @@ export interface ClipStorageUploadResult {
 
 export interface ClipStorageAdapter {
   upload(input: ClipStorageUploadInput): Promise<ClipStorageUploadResult>;
+  /**
+   * Reads back the bytes at a previously-uploaded clip's storage URL.
+   * ENGINEERING_SPEC §4/§12's async post-upload step (transcription +
+   * moderation) needs the actual media bytes again, not just the URL a
+   * viewer's browser would stream from — added for that step rather than
+   * M4's first half, which only ever wrote bytes, never read them back.
+   */
+  download(url: string): Promise<Uint8Array>;
 }

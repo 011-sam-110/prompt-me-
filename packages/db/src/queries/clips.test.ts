@@ -9,7 +9,14 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import * as schema from "../schema";
 import { ensureUserForClerkId } from "./users";
 import { ensurePromptsSeeded, getActivePromptsForTier } from "./prompts";
-import { getClipForUserAndTier, getClipTiersForUser, insertClip } from "./clips";
+import {
+  getClipById,
+  getClipForUserAndTier,
+  getClipTiersForUser,
+  insertClip,
+  updateClipModerationStatus,
+  updateClipTranscript,
+} from "./clips";
 
 const migrationsFolder = resolve(dirname(fileURLToPath(import.meta.url)), "../../drizzle");
 
@@ -93,5 +100,62 @@ describe("clips queries", () => {
   it("getClipForUserAndTier returns undefined when that tier doesn't exist yet", async () => {
     const user = await ensureUserForClerkId(db, "clerk_clips_missing_tier");
     expect(await getClipForUserAndTier(db, user.id, 3)).toBeUndefined();
+  });
+
+  describe("getClipById / updateClipTranscript / updateClipModerationStatus", () => {
+    it("getClipById finds a clip by its own id and returns undefined for an unknown one", async () => {
+      const user = await ensureUserForClerkId(db, "clerk_clips_by_id");
+      const clip = await insertClip(db, {
+        userId: user.id,
+        tier: 1,
+        durationSeconds: 15,
+        storageUrl: "dev-blob://clips/by-id/tier-1.wav",
+        customPromptText: "x",
+      });
+
+      expect((await getClipById(db, clip.id))?.id).toBe(clip.id);
+      expect(await getClipById(db, "00000000-0000-0000-0000-000000000000")).toBeUndefined();
+    });
+
+    it("updateClipTranscript writes the transcript without touching moderation_status", async () => {
+      const user = await ensureUserForClerkId(db, "clerk_clips_transcript");
+      const clip = await insertClip(db, {
+        userId: user.id,
+        tier: 1,
+        durationSeconds: 15,
+        storageUrl: "dev-blob://clips/transcript/tier-1.wav",
+        customPromptText: "x",
+      });
+      expect(clip.transcript).toBeNull();
+
+      const updated = await updateClipTranscript(db, clip.id, "hello, this is the transcript");
+      expect(updated.transcript).toBe("hello, this is the transcript");
+      expect(updated.moderationStatus).toBe("processing");
+    });
+
+    it("updateClipModerationStatus flips the status without touching the transcript", async () => {
+      const user = await ensureUserForClerkId(db, "clerk_clips_mod_status");
+      const clip = await insertClip(db, {
+        userId: user.id,
+        tier: 1,
+        durationSeconds: 15,
+        storageUrl: "dev-blob://clips/mod-status/tier-1.wav",
+        customPromptText: "x",
+      });
+      await updateClipTranscript(db, clip.id, "a transcript");
+
+      const approved = await updateClipModerationStatus(db, clip.id, "approved");
+      expect(approved.moderationStatus).toBe("approved");
+      expect(approved.transcript).toBe("a transcript");
+
+      const flagged = await updateClipModerationStatus(db, clip.id, "pending_review");
+      expect(flagged.moderationStatus).toBe("pending_review");
+    });
+
+    it("updateClipTranscript throws for an unknown clip id", async () => {
+      await expect(
+        updateClipTranscript(db, "00000000-0000-0000-0000-000000000000", "x"),
+      ).rejects.toThrow(/no clip found/);
+    });
   });
 });

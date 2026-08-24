@@ -40,3 +40,6 @@ export const moderationFlags = pgTable(
     ),
   ],
 );
+
+export type ModerationFlag = typeof moderationFlags.$inferSelect;
+export type NewModerationFlag = typeof moderationFlags.$inferInsert;

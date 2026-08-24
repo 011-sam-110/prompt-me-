@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import { ensureUserForClerkId } from "@prompt-me/db";
 import { getAppDb } from "@/lib/db";
 import { getAuthSession } from "@/lib/auth/session";
+import { enqueueClipProcessing } from "@/lib/clips/process-clip";
 import { uploadClip } from "@/lib/clips/upload";
 
 function stringField(form: FormData, key: string): string | null {
@@ -60,6 +61,13 @@ export async function POST(request: Request): Promise<NextResponse> {
       result.error.code === "invalid_tier" || result.error.code === "invalid_prompt_selection" ? 400 : 409;
     return NextResponse.json({ error: result.error }, { status });
   }
+
+  // ENGINEERING_SPEC §4: "enqueue transcription (Whisper) and moderation...
+  // before moderation_status flips to approved." Deliberately not awaited
+  // — the response returns with the clip still "processing"; see
+  // process-clip.ts's top comment for why this counts as "enqueue" with no
+  // real queue infra in place yet.
+  enqueueClipProcessing(db, result.clip.id);
 
   return NextResponse.json({ clip: result.clip }, { status: 201 });
 }
