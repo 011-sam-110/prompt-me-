@@ -14,6 +14,10 @@
     "./playback": {
       "types": "./src/clips/playback.ts",
       "default": "./src/clips/playback.ts"
+    },
+    "./location": {
+      "types": "./src/location/index.ts",
+      "default": "./src/location/index.ts"
     }
   },
   "scripts": {
