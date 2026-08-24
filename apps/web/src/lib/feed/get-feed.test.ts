@@ -127,4 +127,38 @@ describe("getRankedFeedForViewer", () => {
     const recirculatedScore = ranked.find((row) => row.userId === deniedRecirculated.id)!.score;
     expect(recirculatedScore).toBeCloseTo(eligibleScore * DENIAL_PENALTY_MULTIPLIER, 6);
   });
+
+  it("a blocked pair never resurfaces, at any 'now' — contrasted directly against a denied pair, which does (SPEC.md §5: Escape's block is total and permanent, stronger than the 48h/0.3x denied-profile rule)", async () => {
+    const londonGeohash = encodeGeohash(51.5074, -0.1278, 5);
+
+    const viewer = await makeVerifiedLocatedUser("clerk_getfeed_permanence_viewer", londonGeohash);
+    await updateUserRadiusKm(db, viewer.id, 50);
+
+    const blocked = await makeVerifiedLocatedUser("clerk_getfeed_permanence_blocked", londonGeohash);
+    await db.insert(schema.matches).values({ userAId: viewer.id, userBId: blocked.id, status: "blocked" });
+
+    const denied = await makeVerifiedLocatedUser("clerk_getfeed_permanence_denied", londonGeohash);
+    const decidedAt = new Date("2026-08-24T12:00:00.000Z");
+    await db.insert(schema.feedDecisions).values({
+      viewerId: viewer.id,
+      profileUserId: denied.id,
+      decision: "denied",
+      decidedAt,
+      eligibleAgainAt: new Date(decidedAt.getTime() + 48 * HOUR_MS),
+    });
+
+    // A "now" ten years past both events — long past the 48h resurfacing
+    // clock either way, so this isn't merely "the block hasn't expired
+    // yet"; there is no expiry to reach.
+    const farFuture = new Date("2036-08-24T12:00:00.000Z");
+    const ranked = await getRankedFeedForViewer(db, viewer.id, farFuture, () => 0.5);
+    const rankedIds = ranked.map((row) => row.userId);
+
+    // The denied (never-matched) pair resurfaces — the 48h/0.3x rule doing
+    // exactly what it's designed to do.
+    expect(rankedIds).toContain(denied.id);
+    // The blocked pair does not, and never will — the permanent, unranked
+    // exclusion this milestone's Escape action wires up.
+    expect(rankedIds).not.toContain(blocked.id);
+  });
 });

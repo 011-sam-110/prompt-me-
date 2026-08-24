@@ -105,6 +105,30 @@ describe("feed queries", () => {
       expect(rows.some((row) => row.userId === blocker.id)).toBe(false);
     });
 
+    it("a blocked pair stays excluded no matter how stale/expired a co-existing 'denied' feed_decisions row is — stronger than the 48h/0.3x resurfacing rule, which this function never even consults", async () => {
+      const viewer = await makeVerifiedLocatedUser("clerk_feed_blocked_permanent_viewer");
+      const blocker = await makeVerifiedLocatedUser("clerk_feed_blocked_permanent_blocker");
+      await db.insert(schema.matches).values({ userAId: blocker.id, userBId: viewer.id, status: "blocked" });
+
+      // The shape a merely-recirculated (never-matched) pair would have
+      // long after its 48h window closed — ranking.ts's isResurfaceEligible
+      // would let a *denied* profile with this eligibleAgainAt back into
+      // the pool at a 0.3x penalty. getBaseCandidateUsers takes no "now" at
+      // all (this file's own header comment), so a blocked matches row has
+      // to win regardless of how long ago that clock expired.
+      const longAgo = new Date("2020-01-01T00:00:00.000Z");
+      await db.insert(schema.feedDecisions).values({
+        viewerId: viewer.id,
+        profileUserId: blocker.id,
+        decision: "denied",
+        decidedAt: longAgo,
+        eligibleAgainAt: new Date(longAgo.getTime() + 48 * 60 * 60 * 1000),
+      });
+
+      const rows = await getBaseCandidateUsers(db, viewer.id);
+      expect(rows.some((row) => row.userId === blocker.id)).toBe(false);
+    });
+
     it("includes a candidate who is verified, located, and shares no matches row with the viewer", async () => {
       const viewer = await makeVerifiedLocatedUser("clerk_feed_eligible_viewer");
       const eligible = await makeVerifiedLocatedUser("clerk_feed_eligible_candidate", "u4pru");
