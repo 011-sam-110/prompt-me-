@@ -29,10 +29,19 @@ export default defineConfig({
   // machine: the very first "Create a dev account" submission (sign-up's
   // server action -> onboarding's first-ever compile) reliably took
   // longer than the previous 15s budget, every run, not a one-off flake.
-  // 45s gives that first request real headroom without masking a genuine
-  // regression (a warm second hit in the same file, or a later spec,
-  // still resolves in a couple of seconds either way).
-  expect: { timeout: 45_000 },
+  // 45s gave that first request real headroom at the time.
+  //
+  // Bumped again 2026-08-24 building M11's realtime half: this machine
+  // routinely runs several other long-lived agent/session processes
+  // alongside a Playwright run (observed 30+ node processes at once), and
+  // under that load a bare `curl` of a cold /sign-up (nothing past the
+  // first GET) measured ~28s on its own — the full sign-up-account
+  // server-action round trip that 45s used to comfortably cover no longer
+  // fits reliably. 90s keeps the same "don't mask a genuine regression"
+  // intent (a warm hit still resolves in seconds either way) with headroom
+  // for this machine's actual current load rather than its load when the
+  // first number was picked.
+  expect: { timeout: 90_000 },
   use: {
     baseURL: "http://localhost:3100",
     // M3's selfie-capture flow calls getUserMedia — there's no real camera

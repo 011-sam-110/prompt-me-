@@ -16,7 +16,13 @@ import { migrate } from "drizzle-orm/pglite/migrator";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import * as schema from "@prompt-me/db/schema";
 import { ensurePromptsSeeded, ensureUserForClerkId, insertMatchIfNotExists } from "@prompt-me/db";
-import { canonicalizeMatchPair, computeChatWindowTimes } from "@prompt-me/core";
+import {
+  canonicalizeMatchPair,
+  CHAT_MESSAGE_EVENT,
+  chatWindowChannelName,
+  computeChatWindowTimes,
+  subscribeDevMockChannel,
+} from "@prompt-me/core";
 import { proposeDate } from "../date-proposals/propose";
 import { acceptDate } from "../date-proposals/respond";
 import { setDateVenue } from "../date-proposals/set-venue";
@@ -181,6 +187,41 @@ describe("sendChatMessage", () => {
     const expected = computeChatWindowTimes(at("18:00"));
     expect(window.opensAt.getTime()).toBe(expected.opensAt.getTime());
     expect(window.closesAt.getTime()).toBe(expected.closesAt.getTime());
+  });
+
+  it("publishes the new message over the realtime bus after persisting it (this milestone's realtime half — no PUSHER_* set in this test env, so @prompt-me/core's getRealtimeProvider() resolves to the in-memory dev-mock)", async () => {
+    const { window, a } = await makeLockedDateWithWindow("clerk_send_realtime_a", "clerk_send_realtime_b", "18:00");
+
+    const received: unknown[] = [];
+    const unsubscribe = subscribeDevMockChannel(chatWindowChannelName(window.id), (evt) => {
+      received.push(evt);
+    });
+
+    const message = await sendChatMessage(
+      db,
+      { chatWindowId: window.id, senderId: a, body: "hello over realtime" },
+      window.opensAt,
+    );
+    unsubscribe();
+
+    expect(received).toEqual([{ event: CHAT_MESSAGE_EVENT, payload: { message } }]);
+  });
+
+  it("never publishes anything when the send itself is rejected (too early)", async () => {
+    const { window, a } = await makeLockedDateWithWindow("clerk_send_realtime_reject_a", "clerk_send_realtime_reject_b", "18:00");
+
+    const received: unknown[] = [];
+    const unsubscribe = subscribeDevMockChannel(chatWindowChannelName(window.id), (evt) => {
+      received.push(evt);
+    });
+
+    const wayEarly = new Date(window.opensAt.getTime() - 30 * MINUTE_MS);
+    await expect(
+      sendChatMessage(db, { chatWindowId: window.id, senderId: a, body: "too early" }, wayEarly),
+    ).rejects.toBeInstanceOf(ChatWindowNotOpenError);
+    unsubscribe();
+
+    expect(received).toEqual([]);
   });
 
   it("rejects an empty or whitespace-only body even mid-window", async () => {

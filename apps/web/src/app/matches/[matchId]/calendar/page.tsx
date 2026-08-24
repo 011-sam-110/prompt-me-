@@ -112,7 +112,7 @@ export default async function MatchCalendarPage({
 
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-medium text-muted-foreground">Proposed dates</h2>
-        <ProposalList proposals={proposals} viewerId={viewerId} />
+        <ProposalList proposals={proposals} viewerId={viewerId} matchId={matchId} />
       </section>
     </main>
   );

@@ -22,6 +22,10 @@
     "./calendar": {
       "types": "./src/calendar/index.ts",
       "default": "./src/calendar/index.ts"
+    },
+    "./chat-windows": {
+      "types": "./src/chat-windows/index.ts",
+      "default": "./src/chat-windows/index.ts"
     }
   },
   "scripts": {

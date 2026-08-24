@@ -7,6 +7,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle, type PgliteDatabase } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import * as schema from "@prompt-me/db/schema";
 import { blockMatch, ensurePromptsSeeded, ensureUserForClerkId, insertMatchIfNotExists } from "@prompt-me/db";
 import { DateProposalMatchAccessError, DateProposalMatchNotActiveError, getMatchProposals } from "./get-match-proposals";
@@ -49,6 +50,9 @@ describe("getMatchProposals", () => {
     expect(fromA.proposals).toHaveLength(1);
     expect(fromA.proposals[0]!.locked).toBe(false);
     expect(fromA.proposals[0]!.venue).toBeNull();
+    // Not yet locked -> no chat_windows row exists to point an "Open chat"
+    // link at (ROADMAP.md M11's realtime half).
+    expect(fromA.proposals[0]!.chatWindowId).toBeNull();
 
     const fromB = await getMatchProposals(db, match.id, b);
     expect(fromB.otherUserId).toBe(a);
@@ -74,6 +78,11 @@ describe("getMatchProposals", () => {
       address: "12 Church Street",
       types: ["cafe", "food", "point_of_interest", "establishment"],
     });
+
+    // ROADMAP.md M11's realtime half: a locked proposal resolves to the
+    // exact chat_windows row set-venue.ts created for it.
+    const [window] = await db.select().from(schema.chatWindows).where(eq(schema.chatWindows.dateProposalId, proposal.id));
+    expect(row.chatWindowId).toBe(window!.id);
   });
 
   it("throws DateProposalMatchAccessError for a stranger, or a nonexistent matchId", async () => {

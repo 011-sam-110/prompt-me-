@@ -9,3 +9,4 @@ export {
   type ChatWindowTimes,
   type ChatSendAccessDecision,
 } from "./window";
+export { CHAT_MESSAGE_EVENT, chatWindowChannelName } from "./channel";

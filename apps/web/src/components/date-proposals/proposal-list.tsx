@@ -7,6 +7,7 @@
 // sent alongside it.
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import type { ProposalWithDisplay } from "@/lib/date-proposals/get-match-proposals";
 import { submitAcceptDate, submitDeclineDate } from "@/lib/date-proposals/actions";
@@ -34,9 +35,11 @@ const STATUS_LABEL: Record<ProposalWithDisplay["status"], string> = {
 export function ProposalList({
   proposals,
   viewerId,
+  matchId,
 }: {
   proposals: ProposalWithDisplay[];
   viewerId: string;
+  matchId: string;
 }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -131,6 +134,17 @@ export function ProposalList({
                   Meeting at <span className="font-medium text-foreground">{proposal.venue.name}</span>
                   {proposal.venue.address ? ` — ${proposal.venue.address}` : ""}
                 </p>
+              )}
+
+              {proposal.locked && proposal.chatWindowId && (
+                <Link
+                  href={`/matches/${matchId}/chat/${proposal.chatWindowId}`}
+                  data-testid="open-chat-link"
+                  data-chat-window-id={proposal.chatWindowId}
+                  className="self-start text-xs font-medium text-primary hover:underline"
+                >
+                  Open chat &rarr;
+                </Link>
               )}
             </li>
           );
