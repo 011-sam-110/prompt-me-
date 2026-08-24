@@ -11,3 +11,4 @@ export * from "./location";
 export * from "./feed";
 export * from "./matches";
 export * from "./rewatch-sessions";
+export * from "./calendar-slots";

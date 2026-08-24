@@ -20,3 +20,6 @@ export const calendarSlots = pgTable(
   },
   (table) => [check("calendar_slots_end_after_start", sql`${table.endAt} > ${table.startAt}`)],
 );
+
+export type CalendarSlot = typeof calendarSlots.$inferSelect;
+export type NewCalendarSlot = typeof calendarSlots.$inferInsert;

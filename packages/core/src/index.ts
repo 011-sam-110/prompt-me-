@@ -20,3 +20,4 @@ export * from "./location";
 export * from "./feed";
 export * from "./matches";
 export * from "./rewatch";
+export * from "./calendar";

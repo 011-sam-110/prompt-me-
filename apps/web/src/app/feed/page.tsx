@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { getAppDb } from "@/lib/db";
 import { getAuthSession } from "@/lib/auth/session";
 import { resolveOnboarding } from "@/lib/auth/onboarding";
+import Link from "next/link";
 import { LocationCapture } from "@/components/location/location-capture";
 import { RadiusControl } from "@/components/location/radius-control";
 
@@ -40,6 +41,10 @@ export default async function FeedPage() {
           <RadiusControl initialRadiusKm={user.radiusKm} />
         </>
       )}
+
+      <Link href="/matches" className="text-sm text-primary hover:underline">
+        View your matches &rarr;
+      </Link>
 
       <p className="text-xs text-muted-foreground">Signed in as {user.clerkId}</p>
     </main>
