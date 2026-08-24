@@ -21,3 +21,6 @@ export const verificationRecords = pgTable("verification_records", {
     .notNull()
     .defaultNow(),
 });
+
+export type VerificationRecord = typeof verificationRecords.$inferSelect;
+export type NewVerificationRecord = typeof verificationRecords.$inferInsert;

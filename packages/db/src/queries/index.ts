@@ -2,3 +2,4 @@
 // query layer"). One module per milestone's data-access needs; users.ts
 // is M2's.
 export * from "./users";
+export * from "./verification";

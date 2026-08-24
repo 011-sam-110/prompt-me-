@@ -14,16 +14,34 @@ export default defineConfig({
   // sum across a whole test — bump to give every step its own 15s
   // budget (see `expect.timeout` below) without the wrapping test
   // timeout cutting it off first.
-  timeout: 90_000,
+  timeout: 180_000,
   retries: 0,
   reporter: [["list"]],
-  // Dev mode compiles each route on its first request, which can push a
-  // post-click navigation past the default 5s assertion timeout the
-  // first time a given route is hit in a fresh server — not a production
-  // concern, just a dev-server artifact.
-  expect: { timeout: 15_000 },
+  // All specs share one dev server (webServer below, reuseExistingServer:
+  // false). Two workers hitting it at once means two concurrent
+  // first-compiles of different routes on a cold server — on this
+  // machine that crashed the dev server mid-request (ECONNRESET/aborted)
+  // rather than just running slowly. One worker keeps compiles sequential.
+  workers: 1,
+  // Dev mode compiles each route on its first request. M3 made
+  // /onboarding's first compile noticeably heavier (it now pulls in the
+  // camera-capture client component) — observed 2026-08-24 on this
+  // machine: the very first "Create a dev account" submission (sign-up's
+  // server action -> onboarding's first-ever compile) reliably took
+  // longer than the previous 15s budget, every run, not a one-off flake.
+  // 45s gives that first request real headroom without masking a genuine
+  // regression (a warm second hit in the same file, or a later spec,
+  // still resolves in a couple of seconds either way).
+  expect: { timeout: 45_000 },
   use: {
     baseURL: "http://localhost:3100",
+    // M3's selfie-capture flow calls getUserMedia — there's no real camera
+    // on a CI/dev box, so Chromium's fake video device (a synthetic test
+    // pattern) stands in, with permission auto-granted rather than prompted.
+    permissions: ["camera"],
+    launchOptions: {
+      args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"],
+    },
   },
   webServer: {
     command: "npx next dev -p 3100",
@@ -35,6 +53,7 @@ export default defineConfig({
       CLERK_SECRET_KEY: "",
       CLERK_WEBHOOK_SECRET: "",
       DATABASE_URL: "",
+      DIDIT_API_KEY: "",
     },
   },
 });

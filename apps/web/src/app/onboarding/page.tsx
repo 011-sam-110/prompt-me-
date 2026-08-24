@@ -1,11 +1,12 @@
 // ROADMAP.md M2: "Onboarding shell routes an unverified user toward
 // verification (M3) and blocks feed access until verification_status =
-// passed." M3 hasn't been built yet — this page is the traffic-cop that
-// will hand off to it, not the verification flow itself.
+// passed." ROADMAP.md M3 fills in the hand-off: the actual selfie-capture
+// flow (components/verification/selfie-capture.tsx) renders here.
 import { redirect } from "next/navigation";
 import { getAppDb } from "@/lib/db";
 import { getAuthSession } from "@/lib/auth/session";
 import { resolveOnboarding } from "@/lib/auth/onboarding";
+import { SelfieCapture } from "@/components/verification/selfie-capture";
 
 export default async function OnboardingPage() {
   const { clerkId } = await getAuthSession();
@@ -32,10 +33,7 @@ export default async function OnboardingPage() {
           ? "Your last identity/age check didn't pass. You'll be able to retry it here."
           : "Prompt Me verifies every account's identity and age before you can see anyone else's profile."}
       </p>
-      <div className="rounded-lg border border-dashed border-border px-6 py-8 text-sm text-muted-foreground">
-        Identity &amp; age verification (M3) isn&apos;t built yet — this
-        page is the gate that will hand off to it.
-      </div>
+      <SelfieCapture />
     </main>
   );
 }
