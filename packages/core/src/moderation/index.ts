@@ -15,3 +15,8 @@ export {
   type OpenAiOmniModerationProviderConfig,
 } from "./omni-moderation-provider";
 export { getModerationProvider } from "./get-provider";
+export {
+  deriveClipModerationStatusAfterReview,
+  type ClipModerationOutcome,
+  type ModerationFlagReviewSnapshot,
+} from "./clip-review";

@@ -16,7 +16,7 @@ import { ensurePromptsSeeded } from "./prompts";
 import { insertMatchIfNotExists } from "./matches";
 import { acceptDateProposal, createDateProposal } from "./date-proposals";
 import { createChatWindowIfNotExists } from "./chat-windows";
-import { createChatMessage, getChatMessagesForWindow } from "./chat-messages";
+import { createChatMessage, getChatMessageById, getChatMessagesForWindow, removeChatMessage } from "./chat-messages";
 
 const migrationsFolder = resolve(dirname(fileURLToPath(import.meta.url)), "../../drizzle");
 const MINUTE_MS = 60 * 1000;
@@ -77,6 +77,7 @@ describe("chat_messages queries", () => {
     expect(created.chatWindowId).toBe(window.id);
     expect(created.senderId).toBe(a);
     expect(created.body).toBe("Running 5 minutes late, sorry!");
+    expect(created.removedAt).toBeNull();
 
     const rows = await getChatMessagesForWindow(db, window.id);
     expect(rows.map((r) => r.id)).toEqual([created.id]);
@@ -92,5 +93,36 @@ describe("chat_messages queries", () => {
 
     const rows = await getChatMessagesForWindow(db, windowA.id);
     expect(rows.map((r) => r.id)).toEqual([first.id, second.id]);
+  });
+
+  it("getChatMessageById returns the row by id, and undefined for an unknown id", async () => {
+    const { window, a } = await makeWindow("clerk_cm_byid_a", "clerk_cm_byid_b");
+    const created = await createChatMessage(db, { chatWindowId: window.id, senderId: a, body: "hi" });
+
+    expect(await getChatMessageById(db, created.id)).toEqual(created);
+    expect(await getChatMessageById(db, "00000000-0000-0000-0000-000000000000")).toBeUndefined();
+  });
+
+  it("removeChatMessage sets removed_at without touching body, and is idempotent", async () => {
+    const { window, a } = await makeWindow("clerk_cm_remove_a", "clerk_cm_remove_b");
+    const created = await createChatMessage(db, { chatWindowId: window.id, senderId: a, body: "original text" });
+    expect(created.removedAt).toBeNull();
+
+    const removedAt = at("20:00");
+    const removed = await removeChatMessage(db, created.id, removedAt);
+    expect(removed.removedAt?.getTime()).toBe(removedAt.getTime());
+    // The soft-removal never scrubs the stored text — ROADMAP.md M12's
+    // review record stays intact.
+    expect(removed.body).toBe("original text");
+
+    // Idempotent: reviewing (or re-reviewing) the same message again just
+    // re-stamps removed_at rather than erroring.
+    const secondRemovedAt = at("20:05");
+    const removedAgain = await removeChatMessage(db, created.id, secondRemovedAt);
+    expect(removedAgain.removedAt?.getTime()).toBe(secondRemovedAt.getTime());
+
+    await expect(removeChatMessage(db, "00000000-0000-0000-0000-000000000000")).rejects.toThrow(
+      /no chat_messages row/,
+    );
   });
 });

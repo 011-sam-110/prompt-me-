@@ -27,28 +27,17 @@ import {
   getTranscriptionProvider,
   getVideoFrameSampler,
   isValidClipTier,
-  type ModerationCheckOutput,
 } from "@prompt-me/core";
 import {
   getClipById,
-  insertModerationFlag,
   updateClipModerationStatus,
   updateClipTranscript,
   type AnyDb,
   type Clip,
 } from "@prompt-me/db";
+import { recordModerationResult } from "../moderation/record-flags";
 
-/**
- * Confidence threshold above which a moderation category counts as a real
- * flag rather than noise — ENGINEERING_SPEC §12's "any flag above
- * threshold" isn't given a specific number in the spec. 0.5 is the
- * engineering default (OpenAI's own moderation docs treat 0.5 as the
- * boundary their `flagged` booleans are derived from) — named as its own
- * constant so a future revision is a one-line change, same rationale as
- * ../../../../../packages/core/src/clips/tiers.ts's
- * CLIP_DURATION_TOLERANCE_SECONDS.
- */
-export const MODERATION_FLAG_THRESHOLD = 0.5;
+export { MODERATION_FLAG_THRESHOLD } from "../moderation/record-flags";
 
 /**
  * A clip's content type isn't persisted on the `clips` row (engineering
@@ -67,31 +56,6 @@ function inferMimeType(tier: Clip["tier"]): string {
     throw new Error(`processClipUpload: invalid tier ${tier} on stored clip`);
   }
   return CLIP_TIER_SPECS[tier].format === "audio" ? "audio/webm" : "video/webm";
-}
-
-/**
- * Runs one moderation check's output against MODERATION_FLAG_THRESHOLD,
- * recording a `moderation_flags` row for every category that trips it.
- * Returns whether *anything* was flagged, so the caller can decide the
- * clip's overall status.
- */
-async function recordModerationResult(
-  db: AnyDb,
-  clipId: string,
-  result: ModerationCheckOutput,
-): Promise<boolean> {
-  let anyFlagged = false;
-  for (const category of result.categories) {
-    if (category.flagged && category.score >= MODERATION_FLAG_THRESHOLD) {
-      anyFlagged = true;
-      await insertModerationFlag(db, {
-        clipId,
-        flagType: category.category,
-        confidence: category.score,
-      });
-    }
-  }
-  return anyFlagged;
 }
 
 /**
@@ -122,14 +86,14 @@ export async function processClipUpload(db: AnyDb, clipId: string): Promise<Clip
   let flagged = false;
 
   const textResult = await moderation.moderate({ type: "text", text: transcription.transcript });
-  if (await recordModerationResult(db, clip.id, textResult)) flagged = true;
+  if (await recordModerationResult(db, { clipId: clip.id }, textResult)) flagged = true;
 
   if (CLIP_TIER_SPECS[clip.tier as 1 | 2 | 3 | 4].format === "video") {
     const timestampsSeconds = computeFrameSampleTimestamps(clip.durationSeconds);
     const frames = await getVideoFrameSampler().sample({ data, mimeType, timestampsSeconds });
     for (const frame of frames) {
       const frameResult = await moderation.moderate({ type: "image", imageDataUrl: frame });
-      if (await recordModerationResult(db, clip.id, frameResult)) flagged = true;
+      if (await recordModerationResult(db, { clipId: clip.id }, frameResult)) flagged = true;
     }
   }
 

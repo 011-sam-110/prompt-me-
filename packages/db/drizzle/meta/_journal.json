@@ -15,6 +15,13 @@
       "when": 1787541791975,
       "tag": "0001_slow_bishop",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787581007058,
+      "tag": "0002_uneven_the_liberteens",
+      "breakpoints": true
     }
   ]
 }

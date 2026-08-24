@@ -26,6 +26,7 @@
 import { CHAT_MESSAGE_EVENT, chatWindowChannelName, evaluateChatSendAccess, getRealtimeProvider, type ChatSendAccessDecision } from "@prompt-me/core";
 import { createChatMessage, type AnyDb, type ChatMessage } from "@prompt-me/db";
 import { loadChatWindowForParticipant } from "./load-chat-window";
+import { enqueueChatMessageModeration } from "./process-chat-message";
 
 export { ChatWindowNotFoundError, ChatMatchAccessError, ChatMatchNotActiveError } from "./load-chat-window";
 
@@ -93,6 +94,16 @@ export async function sendChatMessage(
     senderId: input.senderId,
     body: input.body,
   });
+
+  // ENGINEERING_SPEC §12: "Chat messages get the same text-moderation
+  // pass, async ... rather than blocking send." Fired here, right after
+  // the write succeeds, and deliberately never awaited — same
+  // "fire-and-forget after the row exists" shape lib/clips/process-clip.ts
+  // uses for enqueueClipProcessing, just triggered inline from the one
+  // composition point that creates a chat_messages row instead of from an
+  // API route (this file's own header comment: "the ONLY place a
+  // chat_messages row gets inserted").
+  enqueueChatMessageModeration(db, message.id, message.body);
 
   // Broadcast only after the write has actually succeeded, so a delivery
   // failure can never leave a "sent" message the recipient never even gets
