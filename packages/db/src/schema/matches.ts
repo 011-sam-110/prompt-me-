@@ -37,3 +37,6 @@ export const matches = pgTable(
     uniqueIndex("matches_user_pair_idx").on(table.userAId, table.userBId),
   ],
 );
+
+export type Match = typeof matches.$inferSelect;
+export type NewMatch = typeof matches.$inferInsert;

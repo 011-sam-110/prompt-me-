@@ -33,3 +33,6 @@ export const feedDecisions = pgTable(
     index("feed_decisions_eligible_again_idx").on(table.eligibleAgainAt),
   ],
 );
+
+export type FeedDecision = typeof feedDecisions.$inferSelect;
+export type NewFeedDecision = typeof feedDecisions.$inferInsert;

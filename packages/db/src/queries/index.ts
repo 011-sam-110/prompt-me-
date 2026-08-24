@@ -8,3 +8,4 @@ export * from "./clips";
 export * from "./clip-views";
 export * from "./moderation";
 export * from "./location";
+export * from "./feed";

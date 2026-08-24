@@ -19,6 +19,18 @@ import type { AnyDb } from "../types";
  * instead of a constraint-violation error; the fallback select then hands
  * back the row that already exists rather than creating a duplicate.
  */
+/**
+ * Plain lookup by primary key — the "get the viewer's own row" half of
+ * ROADMAP.md M6's candidate query (apps/web's lib/feed/get-feed.ts needs
+ * the viewer's own `geohash5`/`radiusKm` before it can call
+ * @prompt-me/db's getFeedCandidatesForViewer), mirroring queries/clips.ts's
+ * getClipById for the same "look this up by id, nothing else" shape.
+ */
+export async function getUserById(db: AnyDb, userId: string): Promise<User | undefined> {
+  const [row] = await db.select().from(users).where(eq(users.id, userId));
+  return row;
+}
+
 export async function ensureUserForClerkId(db: AnyDb, clerkId: string): Promise<User> {
   const inserted = await db
     .insert(users)

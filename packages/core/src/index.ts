@@ -17,3 +17,4 @@ export * from "./transcription";
 export * from "./moderation";
 export * from "./frame-sampling";
 export * from "./location";
+export * from "./feed";
