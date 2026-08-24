@@ -20,3 +20,7 @@ dist/
 
 # test/coverage
 coverage/
+
+# packages/db's dev-mode fallback database (packages/db/src/dev-client.ts)
+# — throwaway local data, never meant to be shared or committed.
+**/.dev-data/

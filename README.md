@@ -46,6 +46,16 @@ npx drizzle-kit migrate
 No live Neon connection string exists yet (see `ROADMAP.md` → *Needs from Sampo*). Until one does:
 - `packages/db/src/client.ts`'s `getDb()` only reads `DATABASE_URL` when actually called — importing the package or running the gate never requires it.
 - Schema correctness (every FK, CHECK, UNIQUE, enum, and cascade/restrict delete rule) is verified against a real embedded Postgres instead: `packages/db/src/schema/schema.test.ts` runs the actual generated migration through [`@electric-sql/pglite`](https://pglite.dev/) and asserts on the constraint violations it produces. This is the "local/dev Postgres" the gate exercises until a real Neon database is wired up.
+- `apps/web` still needs *something* to persist to when you actually run it (`npm run dev`), so `apps/web/src/lib/db.ts` falls back to `packages/db/src/dev-client.ts`'s file-backed PGlite instance (auto-migrated, gitignored under `packages/db/.dev-data`) whenever `DATABASE_URL` is unset — the same "dev-mode fallback" pattern as auth (below), applied to persistence.
+
+### Auth (Clerk, M2)
+
+No real Clerk keys exist yet either (see `ROADMAP.md` → *Needs from Sampo*). `apps/web/src/lib/auth/config.ts`'s `isClerkConfigured()` checks for both `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`; until both are set, every auth surface automatically falls back to a dev-mode stub instead of the real Clerk SDK:
+- `/sign-up` and `/sign-in` render a form that mints a fake `dev_...` account id into a cookie (`apps/web/src/lib/auth/dev-actions.ts`) rather than Clerk's real `<SignUp>`/`<SignIn>`.
+- `middleware.ts` protects routes off that cookie instead of a real Clerk session.
+- On first sign-in, `ensureUserForClerkId` (`packages/db/src/queries/users.ts`) creates the corresponding `users` row exactly once per account — enforced by the `users_clerk_id_idx` UNIQUE constraint, called from both a server-side session check (the trigger that runs today) and a Clerk webhook (`apps/web/src/app/api/webhooks/clerk`, live once real keys + `CLERK_WEBHOOK_SECRET` exist).
+
+This means the whole sign-up → onboarding-gate flow is exercised in `apps/web/playwright/onboarding.spec.ts` with zero real credentials.
 
 ### Gate
 
@@ -53,4 +63,10 @@ No live Neon connection string exists yet (see `ROADMAP.md` → *Needs from Samp
 npm run typecheck && npm run lint && npm run test -- --run
 ```
 
-UI milestones additionally require Playwright screenshot evidence saved to `.claude/debug-shots/` (see `ENGINEERING_SPEC.md` §16).
+UI milestones additionally require Playwright screenshot evidence saved to `.claude/debug-shots/` (see `ENGINEERING_SPEC.md` §16):
+
+```bash
+# From apps/web — starts its own dev server against the dev-mode
+# auth/DB fallbacks above, no credentials needed:
+npx playwright test
+```

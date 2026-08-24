@@ -9,3 +9,7 @@
 export * from "./schema";
 export { getDb, __resetDbCacheForTests } from "./client";
 export type { Database } from "./client";
+export { getDevDb, __resetDevDbCacheForTests } from "./dev-client";
+export type { DevDatabase } from "./dev-client";
+export type { AnyDb } from "./types";
+export * from "./queries";

@@ -42,3 +42,6 @@ export const users = pgTable(
     check("users_radius_km_positive", sql`${table.radiusKm} > 0`),
   ],
 );
+
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;

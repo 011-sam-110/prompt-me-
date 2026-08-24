@@ -13,13 +13,13 @@ Acceptance:
 - [x] README documents local dev setup (env vars, DB migrate command).
 
 ### M2: Auth & onboarding shell
-Status: [ ]
+Status: [x] done (2026-08-24, pending-commit)
 Depends on: M1
 Spec: ENGINEERING_SPEC.md §1 (Clerk)
 Acceptance:
-- [ ] Sign-up/sign-in via Clerk creates a `users` row.
-- [ ] Onboarding shell routes an unverified user toward verification (M3) and blocks feed access until `verification_status = passed`.
-- [ ] Unit tests cover the account-creation → onboarding-state transition.
+- [x] Sign-up/sign-in via Clerk creates a `users` row.
+- [x] Onboarding shell routes an unverified user toward verification (M3) and blocks feed access until `verification_status = passed`.
+- [x] Unit tests cover the account-creation → onboarding-state transition.
 
 ### M3: Identity & age verification
 Status: [ ]
@@ -143,3 +143,4 @@ Real credentials required before each milestone can run against live services (a
 (Appended one line per milestone as Round 1 completes it — see LOOP.md.)
 
 - **M1** (2026-08-24, 4a95770): npm-workspaces monorepo scaffolded (`apps/web` Next.js 15/App Router/TS/Tailwind v4/shadcn-ui, `packages/core`, `packages/db`); Drizzle schema for all 15 ENGINEERING_SPEC.md §2 tables with every FK/CHECK/UNIQUE/enum/cascade rule; generated migration verified against a real embedded Postgres (`@electric-sql/pglite`) in `packages/db/src/schema/schema.test.ts` (36 tests, all green) since no live Neon string exists yet; `getDb()` lazily reads `DATABASE_URL` so a missing credential never blocks typecheck/lint/test/build; `next build` succeeds; README documents env vars + migrate commands.
+- **M2** (2026-08-24, pending-commit): Clerk wired into `apps/web` (`@clerk/nextjs`, middleware-based route protection, `/sign-in`, `/sign-up`) behind a real on/off switch (`isClerkConfigured()`) — since no real Clerk keys exist yet, every auth surface (provider, sign-in/up pages, middleware, session lookup) falls back to a cookie-backed dev-mode stub instead, so the app runs and is Playwright-testable with zero credentials. `packages/db/src/queries/users.ts`'s `ensureUserForClerkId` creates a `users` row exactly once per account — enforced by the existing `users_clerk_id_idx` UNIQUE constraint plus `onConflictDoNothing`, proven under concurrent calls in `packages/db/src/queries/users.test.ts` — called from both a Clerk webhook (`api/webhooks/clerk`, real-Clerk-only) and a server-side session check on every authenticated request (`lib/auth/onboarding.ts`, the trigger that actually runs today). `packages/core/src/onboarding.ts` adds a framework/DB-free `onboardingStateForUser` state machine (pending/failed/passed → needs_verification/verification_failed/active) reused by both the DB-layer test and the web app. Since no live Neon string exists either, `packages/db/src/dev-client.ts` adds a file-backed PGlite dev database (`getDevDb()`) so the onboarding gate is genuinely clickable end to end without any credentials — required excluding `@electric-sql/pglite` from webpack via `serverExternalPackages` (bundling it broke its Node fs persistence on Windows). 53 tests green (typecheck/lint/test all pass); Playwright screenshots of the full sign-up → onboarding-blocked → `/feed` redirect flow in `.claude/debug-shots/m2-*.png`.
