@@ -11,7 +11,7 @@ import * as schema from "../schema";
 import { ensureUserForClerkId } from "./users";
 import { ensurePromptsSeeded } from "./prompts";
 import { insertClip } from "./clips";
-import { getClipView, recordClipViewPosition } from "./clip-views";
+import { getClipView, getCompletedClipIdsForViewerAndProfile, recordClipViewPosition } from "./clip-views";
 
 const migrationsFolder = resolve(dirname(fileURLToPath(import.meta.url)), "../../drizzle");
 
@@ -151,5 +151,106 @@ describe("clip-views queries", () => {
 
     expect((await getClipView(db, viewerA.id, clip.id))?.completed).toBe(true);
     expect(await getClipView(db, viewerB.id, clip.id)).toBeUndefined();
+  });
+
+  describe("getCompletedClipIdsForViewerAndProfile", () => {
+    it("is empty with no reports at all — ENGINEERING_SPEC §7's viewer-side input", async () => {
+      const viewer = await ensureUserForClerkId(db, "clerk_completed_ids_empty_viewer");
+      const owner = await ensureUserForClerkId(db, "clerk_completed_ids_empty_owner");
+      expect(await getCompletedClipIdsForViewerAndProfile(db, viewer.id, owner.id)).toEqual(new Set());
+    });
+
+    it("excludes clips reported but not yet completed", async () => {
+      const viewer = await ensureUserForClerkId(db, "clerk_completed_ids_partial_viewer");
+      const owner = await ensureUserForClerkId(db, "clerk_completed_ids_partial_owner");
+      const clip = await insertClip(db, {
+        userId: owner.id,
+        tier: 1,
+        durationSeconds: 15,
+        storageUrl: "dev-blob://x",
+        customPromptText: "x",
+      });
+      await recordClipViewPosition(db, {
+        viewerId: viewer.id,
+        profileUserId: owner.id,
+        clipId: clip.id,
+        reachedEnd: false,
+      });
+
+      expect(await getCompletedClipIdsForViewerAndProfile(db, viewer.id, owner.id)).toEqual(new Set());
+    });
+
+    it("returns exactly the completed clip ids for that (viewer, profile) pair", async () => {
+      const viewer = await ensureUserForClerkId(db, "clerk_completed_ids_full_viewer");
+      const owner = await ensureUserForClerkId(db, "clerk_completed_ids_full_owner");
+      const tier1 = await insertClip(db, {
+        userId: owner.id,
+        tier: 1,
+        durationSeconds: 15,
+        storageUrl: "dev-blob://a",
+        customPromptText: "x",
+      });
+      const tier2 = await insertClip(db, {
+        userId: owner.id,
+        tier: 2,
+        durationSeconds: 30,
+        storageUrl: "dev-blob://b",
+        customPromptText: "y",
+      });
+      await recordClipViewPosition(db, {
+        viewerId: viewer.id,
+        profileUserId: owner.id,
+        clipId: tier1.id,
+        reachedEnd: true,
+      });
+      await recordClipViewPosition(db, {
+        viewerId: viewer.id,
+        profileUserId: owner.id,
+        clipId: tier2.id,
+        reachedEnd: false,
+      });
+
+      expect(await getCompletedClipIdsForViewerAndProfile(db, viewer.id, owner.id)).toEqual(
+        new Set([tier1.id]),
+      );
+    });
+
+    it("never mixes another viewer's or another profile's completions in", async () => {
+      const viewerA = await ensureUserForClerkId(db, "clerk_completed_ids_cross_viewer_a");
+      const viewerB = await ensureUserForClerkId(db, "clerk_completed_ids_cross_viewer_b");
+      const owner = await ensureUserForClerkId(db, "clerk_completed_ids_cross_owner");
+      const otherOwner = await ensureUserForClerkId(db, "clerk_completed_ids_cross_other_owner");
+      const clip = await insertClip(db, {
+        userId: owner.id,
+        tier: 1,
+        durationSeconds: 15,
+        storageUrl: "dev-blob://a",
+        customPromptText: "x",
+      });
+      const otherClip = await insertClip(db, {
+        userId: otherOwner.id,
+        tier: 1,
+        durationSeconds: 15,
+        storageUrl: "dev-blob://b",
+        customPromptText: "y",
+      });
+      await recordClipViewPosition(db, {
+        viewerId: viewerA.id,
+        profileUserId: owner.id,
+        clipId: clip.id,
+        reachedEnd: true,
+      });
+      await recordClipViewPosition(db, {
+        viewerId: viewerA.id,
+        profileUserId: otherOwner.id,
+        clipId: otherClip.id,
+        reachedEnd: true,
+      });
+
+      expect(await getCompletedClipIdsForViewerAndProfile(db, viewerA.id, owner.id)).toEqual(
+        new Set([clip.id]),
+      );
+      expect(await getCompletedClipIdsForViewerAndProfile(db, viewerB.id, owner.id)).toEqual(new Set());
+    });
   });
 });

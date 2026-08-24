@@ -61,12 +61,12 @@ Acceptance:
 - [x] Unverified users (M3) never appear as candidates.
 
 ### M7: Match lifecycle & Escape/block
-Status: [ ]
+Status: [ ] in progress — match detection done, Escape/block not yet built
 Depends on: M6
 Spec: SPEC.md §5, ENGINEERING_SPEC.md §7
 Acceptance:
-- [ ] Mutual full-completion (both directions) creates a `matches` row and removes both users from each other's future candidate queries.
-- [ ] One-directional completion does not create a match.
+- [x] Mutual full-completion (both directions) creates a `matches` row and removes both users from each other's future candidate queries.
+- [x] One-directional completion does not create a match.
 - [ ] Escape sets `matches.status = blocked`, immediately removing the pair from the planning UI and preventing any future feed resurfacing between them.
 - [ ] State-machine unit tests cover every transition in the Fig. 2 diagram (SPEC.md/artifact).
 

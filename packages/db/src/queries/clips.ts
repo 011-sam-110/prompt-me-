@@ -16,6 +16,20 @@ export async function getClipTiersForUser(db: AnyDb, userId: string): Promise<nu
   return rows.map((row) => row.tier);
 }
 
+/** Every clip id this user currently has uploaded — ENGINEERING_SPEC §7's
+ * "every clip currently uploaded by the profile owner", the owner-side
+ * input `hasCompletedAllClips` (@prompt-me/core) needs. Deliberately not
+ * filtered by `moderation_status`: §7's own wording names the clip set "as
+ * it existed at viewing time" with no approved-only qualifier, and a clip a
+ * viewer genuinely can't see yet (still `processing`/`pending_review`)
+ * already can't have a `clip_views` row for that viewer either — it simply
+ * can't be completed yet, which correctly holds the match back without this
+ * query needing to special-case moderation state itself. */
+export async function getClipIdsForUser(db: AnyDb, userId: string): Promise<string[]> {
+  const rows = await db.select({ id: clips.id }).from(clips).where(eq(clips.userId, userId));
+  return rows.map((row) => row.id);
+}
+
 export async function getClipForUserAndTier(
   db: AnyDb,
   userId: string,

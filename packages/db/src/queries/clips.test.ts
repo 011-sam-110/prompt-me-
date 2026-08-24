@@ -12,6 +12,7 @@ import { ensurePromptsSeeded, getActivePromptsForTier } from "./prompts";
 import {
   getClipById,
   getClipForUserAndTier,
+  getClipIdsForUser,
   getClipsForUserInUploadOrder,
   getClipTiersForUser,
   insertClip,
@@ -200,6 +201,50 @@ describe("clips queries", () => {
       });
 
       expect(await getClipsForUserInUploadOrder(db, userB.id)).toEqual([]);
+    });
+  });
+
+  describe("getClipIdsForUser", () => {
+    it("is empty for a user with no clips — ENGINEERING_SPEC §7's owner-side input", async () => {
+      const user = await ensureUserForClerkId(db, "clerk_clips_ids_empty");
+      expect(await getClipIdsForUser(db, user.id)).toEqual([]);
+    });
+
+    it("returns every clip id this user has uploaded, regardless of moderation_status", async () => {
+      const user = await ensureUserForClerkId(db, "clerk_clips_ids_multi");
+      const approved = await insertClip(db, {
+        userId: user.id,
+        tier: 1,
+        durationSeconds: 15,
+        storageUrl: "dev-blob://ids/tier-1.wav",
+        customPromptText: "x",
+      });
+      await updateClipModerationStatus(db, approved.id, "approved");
+      const stillProcessing = await insertClip(db, {
+        userId: user.id,
+        tier: 2,
+        durationSeconds: 30,
+        storageUrl: "dev-blob://ids/tier-2.webm",
+        customPromptText: "y",
+      });
+
+      expect((await getClipIdsForUser(db, user.id)).sort()).toEqual(
+        [approved.id, stillProcessing.id].sort(),
+      );
+    });
+
+    it("never returns another user's clip ids", async () => {
+      const userA = await ensureUserForClerkId(db, "clerk_clips_ids_a");
+      const userB = await ensureUserForClerkId(db, "clerk_clips_ids_b");
+      await insertClip(db, {
+        userId: userA.id,
+        tier: 1,
+        durationSeconds: 15,
+        storageUrl: "dev-blob://ids/a-tier-1.wav",
+        customPromptText: "a",
+      });
+
+      expect(await getClipIdsForUser(db, userB.id)).toEqual([]);
     });
   });
 });

@@ -20,6 +20,32 @@ export async function getClipView(
   return row;
 }
 
+/**
+ * Every clip id this viewer has completed, for one specific profile owner —
+ * the viewer-side input `hasCompletedAllClips` (@prompt-me/core) needs for
+ * ENGINEERING_SPEC §7's match check. `profileUserId` is stored directly on
+ * each `clip_views` row (this table's own header comment), so this reads
+ * straight off it rather than joining out to `clips` to re-derive which
+ * clips belong to which owner.
+ */
+export async function getCompletedClipIdsForViewerAndProfile(
+  db: AnyDb,
+  viewerId: string,
+  profileUserId: string,
+): Promise<Set<string>> {
+  const rows = await db
+    .select({ clipId: clipViews.clipId })
+    .from(clipViews)
+    .where(
+      and(
+        eq(clipViews.viewerId, viewerId),
+        eq(clipViews.profileUserId, profileUserId),
+        eq(clipViews.completed, true),
+      ),
+    );
+  return new Set(rows.map((row) => row.clipId));
+}
+
 export interface RecordClipViewPositionInput {
   viewerId: string;
   profileUserId: string;

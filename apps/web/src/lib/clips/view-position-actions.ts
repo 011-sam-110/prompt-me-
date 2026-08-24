@@ -17,6 +17,10 @@ import { reportClipViewPosition } from "./report-view-position";
 
 export interface ClipViewPositionResult {
   completed: boolean;
+  /** ENGINEERING_SPEC §7: whether this report was the one that completed
+   * mutual full-completion in both directions. Most reports leave this
+   * `false` — it only flips on the specific write that closes the loop. */
+  matched: boolean;
 }
 
 export async function submitClipViewPosition(
@@ -36,5 +40,5 @@ export async function submitClipViewPosition(
     throw new Error(`submitClipViewPosition: ${result.error.code} — ${result.error.message}`);
   }
 
-  return { completed: result.clipView.completed };
+  return { completed: result.clipView.completed, matched: result.match !== null };
 }

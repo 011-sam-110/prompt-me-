@@ -12,8 +12,22 @@
 // view counts as complete is *always* re-derived here from the clip's own
 // stored duration (@prompt-me/core's hasReachedClipEnd), never taken from
 // what a caller claims.
+//
+// This is also the literal "on every clip_views write" point ENGINEERING_SPEC
+// §7 hangs match detection off of: once recordClipViewPosition below
+// returns, lib/matches/check-and-create-match.ts's checkAndCreateMatchIfMutual
+// runs against the row that was just written, every time, unconditionally —
+// not just on the reports that happen to complete something.
 import { hasReachedClipEnd } from "@prompt-me/core";
-import { getClipById, recordClipViewPosition, type AnyDb, type ClipView } from "@prompt-me/db";
+import { getClipById, recordClipViewPosition, type AnyDb, type ClipView, type Match } from "@prompt-me/db";
+// Relative, not "@/lib/...", deliberately: every other lib/*.ts composition
+// point in this codebase (capture-location.ts, run-check.ts, upload.ts)
+// only ever imports @prompt-me/core + @prompt-me/db, never another lib/
+// module — this is the first cross-domain composition dependency, and the
+// "@/..." alias is reserved for the app-layer wiring files (actions.ts,
+// route.ts, page.tsx) that sit a level above these, per every existing
+// import in this directory.
+import { checkAndCreateMatchIfMutual } from "../matches/check-and-create-match";
 
 export interface ClipViewPositionInput {
   viewerId: string;
@@ -28,7 +42,7 @@ export type ReportViewPositionError =
   | { code: "invalid_position"; message: string };
 
 export type ReportViewPositionResult =
-  | { ok: true; clipView: ClipView }
+  | { ok: true; clipView: ClipView; match: Match | null }
   | { ok: false; error: ReportViewPositionError };
 
 export async function reportClipViewPosition(
@@ -58,5 +72,7 @@ export async function reportClipViewPosition(
     reachedEnd,
   });
 
-  return { ok: true, clipView };
+  const match = await checkAndCreateMatchIfMutual(db, clipView);
+
+  return { ok: true, clipView, match };
 }

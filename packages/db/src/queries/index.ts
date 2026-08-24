@@ -9,3 +9,4 @@ export * from "./clip-views";
 export * from "./moderation";
 export * from "./location";
 export * from "./feed";
+export * from "./matches";
