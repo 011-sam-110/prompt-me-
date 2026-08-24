@@ -66,3 +66,6 @@ export const clips = pgTable(
     uniqueIndex("clips_user_tier_idx").on(table.userId, table.tier),
   ],
 );
+
+export type Clip = typeof clips.$inferSelect;
+export type NewClip = typeof clips.$inferInsert;

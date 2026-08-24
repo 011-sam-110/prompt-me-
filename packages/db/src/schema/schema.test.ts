@@ -69,6 +69,7 @@ describe("packages/db schema", () => {
   let client: PGlite;
   let db: PgliteDatabase<typeof schema>;
   let clerkCounter = 0;
+  let promptCounter = 0;
 
   beforeAll(async () => {
     client = new PGlite();
@@ -94,9 +95,13 @@ describe("packages/db schema", () => {
   }
 
   async function makePrompt(tier: number) {
+    promptCounter += 1;
+    // Distinct text per call — prompts now carries a UNIQUE(tier, text)
+    // index (schema/prompts.ts, added for ROADMAP.md M4's seed step), so
+    // reusing the same text for the same tier across tests would collide.
     const [prompt] = await db
       .insert(schema.prompts)
-      .values({ tier, text: `prompt tier ${tier}` })
+      .values({ tier, text: `prompt tier ${tier} #${promptCounter}` })
       .returning();
     return prompt;
   }

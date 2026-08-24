@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "prompts_tier_text_idx" ON "prompts" USING btree ("tier","text");

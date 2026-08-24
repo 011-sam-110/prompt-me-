@@ -37,6 +37,7 @@ import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle, type PgliteDatabase } from "drizzle-orm/pglite";
 import { migrate } from "drizzle-orm/pglite/migrator";
+import { ensurePromptsSeeded } from "./queries/prompts";
 import * as schema from "./schema";
 
 export type DevDatabase = PgliteDatabase<typeof schema>;
@@ -70,6 +71,11 @@ export function getDevDb(): Promise<DevDatabase> {
       const client = new PGlite(dataDir);
       const db = drizzle(client, { schema });
       await migrate(db, { migrationsFolder });
+      // ROADMAP.md M4: the placeholder prompt bank exists with zero manual
+      // setup, same "auto-bootstrap on first use" spirit as the migration
+      // above — ensurePromptsSeeded is itself idempotent, so this is safe
+      // to run on every process start, not just the very first one.
+      await ensurePromptsSeeded(db);
       return db;
     })();
   }

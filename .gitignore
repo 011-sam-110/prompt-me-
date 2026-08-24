@@ -24,3 +24,7 @@ coverage/
 # packages/db's dev-mode fallback database (packages/db/src/dev-client.ts)
 # — throwaway local data, never meant to be shared or committed.
 **/.dev-data/
+
+# packages/core's dev-mode fallback clip storage
+# (packages/core/src/storage/mock-clip-storage-adapter.ts) — same reason.
+**/.dev-blob-data/

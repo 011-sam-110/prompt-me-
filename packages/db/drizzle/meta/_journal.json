@@ -8,6 +8,13 @@
       "when": 1787531877842,
       "tag": "0000_far_joshua_kane",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787541791975,
+      "tag": "0001_slow_bishop",
+      "breakpoints": true
     }
   ]
 }

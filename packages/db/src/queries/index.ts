@@ -3,3 +3,5 @@
 // is M2's.
 export * from "./users";
 export * from "./verification";
+export * from "./prompts";
+export * from "./clips";
